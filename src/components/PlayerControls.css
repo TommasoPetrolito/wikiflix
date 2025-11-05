@@ -1,0 +1,121 @@
+.player-controls-overlay {
+  position: absolute;
+  bottom: 100px; /* Increased from 20px to account for macOS dock */
+  right: 20px;
+  z-index: 10;
+}
+
+/* Ensure controls are above dock on macOS */
+@supports (-webkit-appearance: none) {
+  .player-controls-overlay {
+    bottom: max(100px, env(safe-area-inset-bottom, 100px));
+  }
+}
+
+.player-controls {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.control-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+}
+
+.control-btn:hover {
+  background: rgba(0, 0, 0, 0.9);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+.control-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.skip-recap {
+  background: rgba(229, 9, 20, 0.8);
+  border-color: rgba(229, 9, 20, 0.5);
+}
+
+.skip-recap:hover {
+  background: rgba(229, 9, 20, 1);
+  border-color: rgba(229, 9, 20, 0.8);
+}
+
+.speed-control {
+  position: relative;
+}
+
+.speed-btn {
+  min-width: 60px;
+  justify-content: center;
+}
+
+.speed-menu {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 0.5rem;
+  background: rgba(0, 0, 0, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 0.5rem;
+  backdrop-filter: blur(20px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 80px;
+}
+
+.speed-option {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.speed-option:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.speed-option.active {
+  background: rgba(229, 9, 20, 0.3);
+  color: #e50914;
+  font-weight: 700;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .player-controls-overlay {
+    bottom: 80px; /* Less space needed on mobile */
+    right: 10px;
+  }
+
+  .player-controls {
+    gap: 0.5rem;
+  }
+
+  .control-btn {
+    padding: 0.5rem 0.8rem;
+    font-size: 0.85rem;
+  }
+}
+

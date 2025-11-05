@@ -1,0 +1,76 @@
+.mood-selector {
+  padding: 1rem 4%;
+  margin-bottom: 1.5rem;
+}
+
+.mood-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.mood-grid {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.mood-button {
+  padding: 0.5rem 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.mood-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--mood-color, #e50914), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.mood-button:hover::before {
+  opacity: 0.15;
+}
+
+.mood-button:hover {
+  transform: translateY(-4px);
+  border-color: var(--mood-color, #e50914);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+.mood-button.loading {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.mood-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: white;
+  position: relative;
+  z-index: 1;
+}
+
+.mood-spinner {
+  font-size: 0.9rem;
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 768px) {
+  .mood-grid {
+    flex-direction: row;
+  }
+}
+

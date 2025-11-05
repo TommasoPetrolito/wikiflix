@@ -1,0 +1,288 @@
+.content-row {
+  position: relative;
+  width: 100%;
+  padding: 0 0 2.5rem;
+  animation: fadeInUp 0.6s ease;
+  overflow: visible; /* Critical: allow expanded cards to overflow */
+}
+
+.content-row::before {
+  content: '';
+  position: absolute;
+  inset: 0 4% auto 4%;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.12) 50%, rgba(255, 255, 255, 0) 100%);
+  opacity: 0.4;
+}
+
+.content-row.featured {
+  padding: 2.5rem 0 3rem;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.row-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 4%;
+  margin-bottom: 1.4rem;
+  gap: 1rem;
+}
+
+.row-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #ffffff;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.row-title::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 14px rgba(229, 9, 20, 0.6);
+}
+
+.row-title::after {
+  content: '';
+  position: absolute;
+  bottom: -12px;
+  left: 0;
+  width: 72px;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--primary) 0%, var(--accent-blue) 100%);
+  opacity: 0.8;
+}
+
+.row-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 0.45rem 1.1rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.badge-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.badge-text {
+  letter-spacing: 0.3px;
+}
+
+.content-grid {
+  padding: 0 4%;
+  display: flex;
+  gap: 1.6rem;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible; /* Critical: allow expanded cards to overflow vertically */
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  position: relative;
+  padding-bottom: 0.5rem;
+  padding-top: 12rem; /* Add top padding to allow space for expanded cards */
+  margin-top: -12rem; /* Offset the padding so normal cards appear in correct position */
+}
+
+.content-grid::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+.content-grid > .grid-item {
+  position: relative;
+  flex: 0 0 260px;
+  min-width: 260px;
+  max-width: 260px;
+  display: flex;
+  align-items: stretch;
+  will-change: transform;
+  z-index: 1; /* Default z-index for grid items */
+}
+
+/* Elevate the grid item when its card is expanded */
+.content-grid > .grid-item:has(.content-card.expanded) {
+  z-index: 1001 !important; /* Much higher to ensure it's above all siblings */
+  isolation: isolate; /* Create stacking context */
+}
+
+/* Centered, elevated preview panel like Top 10 */
+.grid-item .content-card.expanded {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  width: 520px;
+  aspect-ratio: 16/9;
+  transform: translateX(-50%) !important;
+  box-shadow: 0 30px 100px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.06);
+  z-index: 1000 !important; /* Much higher z-index with !important to ensure it's always on top */
+  will-change: transform, opacity;
+  animation: previewIn 180ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  border-radius: 12px;
+  background: radial-gradient(120% 200% at 0% 0%, rgba(229,9,20,0.08) 0%, transparent 60%),
+              radial-gradient(120% 200% at 100% 0%, rgba(11,132,255,0.08) 0%, transparent 60%),
+              rgba(10,10,10,0.75);
+  backdrop-filter: blur(6px) saturate(120%);
+  -webkit-backdrop-filter: blur(6px) saturate(120%);
+  isolation: isolate; /* Create new stacking context */
+}
+
+.grid-item .content-card.expanded::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 12px;
+  background: radial-gradient(120% 140% at 50% 120%, rgba(0,0,0,0.6) 0%, transparent 55%);
+  z-index: 1; /* below iframe (z-index: 8) */
+}
+
+.grid-item .content-card.expanded::after {
+  content: '';
+  position: absolute;
+  inset: -18px;
+  border-radius: 16px;
+  pointer-events: none;
+  background: conic-gradient(from 180deg at 50% 50%, rgba(229,9,20,0.28), rgba(11,132,255,0.25), rgba(229,9,20,0.28));
+  filter: blur(22px) saturate(120%);
+  opacity: 0.6;
+}
+
+.grid-item .content-card.expanded .card-player {
+  border-radius: 12px;
+  transform: translateZ(0); /* ensure GPU */
+}
+
+@keyframes previewIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+/* First item should not overflow left */
+.grid-item:first-child .content-card.expanded {
+  left: 0;
+  transform: none !important;
+}
+
+@media (max-width: 1200px) {
+  .content-grid > .grid-item {
+    flex: 0 0 190px;
+    min-width: 190px;
+  }
+  .grid-item .content-card.expanded {
+    top: 10px;
+    width: 440px;
+  }
+
+  .row-title {
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .row-title {
+    font-size: 1.15rem;
+  }
+
+  .content-grid {
+    gap: 0.8rem;
+  }
+
+  .content-grid > .grid-item {
+    flex: 0 0 160px;
+    min-width: 160px;
+  }
+  .grid-item .content-card.expanded {
+    top: 8px;
+    width: 360px;
+  }
+
+  .content-row {
+    margin-bottom: 2.5rem;
+  }
+
+  .content-row.featured {
+    margin-bottom: 3rem;
+    padding: 1.5rem 0;
+  }
+
+  .row-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .row-badge {
+    font-size: 0.75rem;
+    padding: 0.3rem 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .row-title {
+    font-size: 1rem;
+  }
+
+  .content-grid {
+    gap: 0.6rem;
+  }
+
+  .content-grid > div {
+    flex: 0 0 130px;
+    min-width: 130px;
+  }
+
+  .content-row {
+    margin-bottom: 2rem;
+  }
+
+  .content-row.featured {
+    margin-bottom: 2.5rem;
+    padding: 1rem 0;
+  }
+
+  .row-badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.6rem;
+  }
+}
+

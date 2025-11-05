@@ -1,0 +1,50 @@
+{
+  "name": "flux-streaming-platform",
+  "version": "1.0.0",
+  "description": "A modern streaming platform clone built with React, TypeScript, and Vite. Features 75K+ movies and TV shows via TMDB API.",
+  "type": "module",
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/enyw/flux.git"
+  },
+  "keywords": [
+    "streaming",
+    "movies",
+    "tv-shows",
+    "react",
+    "typescript",
+    "vite",
+    "netflix-clone",
+    "tmdb",
+    "video-player",
+    "entertainment"
+  ],
+  "bugs": {
+    "url": "https://github.com/enyw/flux/issues"
+  },
+  "homepage": "https://github.com/enyw/flux#readme",
+  "scripts": {
+    "setup": "node scripts/setup.js",
+    "postinstall": "node scripts/setup.js",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "get-ip": "./get-ip.sh"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0",
+    "framer-motion": "^10.16.16"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "typescript": "^5.2.2",
+    "vite": "^5.0.8"
+  }
+}
+

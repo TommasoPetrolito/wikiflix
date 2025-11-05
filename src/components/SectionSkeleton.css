@@ -1,0 +1,47 @@
+.skeleton-section {
+  margin-bottom: 3rem;
+  padding: 0 4%;
+}
+
+.skeleton-header {
+  margin-bottom: 1.2rem;
+}
+
+.skeleton-title {
+  width: 200px;
+  height: 32px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 100%);
+  background-size: 200% 100%;
+  border-radius: 4px;
+  animation: shimmer 1.5s infinite;
+}
+
+.skeleton-grid {
+  display: flex;
+  gap: 1.2rem;
+  overflow: hidden;
+}
+
+.skeleton-card {
+  flex: 0 0 220px;
+  min-width: 220px;
+}
+
+.skeleton-poster {
+  width: 100%;
+  aspect-ratio: 2/3;
+  background: linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 100%);
+  background-size: 200% 100%;
+  border-radius: 8px;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
