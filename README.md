@@ -2,16 +2,21 @@
 
 # 🎬 Flux
 
-**A modern streaming platform clone built with React, TypeScript, and Vite**
+**A modern streaming platform UI built with React, TypeScript, and Vite**
 
-[![React](https://img.shields.io/badge/React-18.2-blue.svg)](https://reactjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.2-blue.svg)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-5.0-purple.svg)](https://vitejs.dev/)
+[![React](https://img.shields.io/badge/React-18.2-61DAFB?logo=react&logoColor=white)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.2-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-5.0-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/Ennyw/flux?style=social)](https://github.com/Ennyw/flux)
+[![GitHub Forks](https://img.shields.io/github/forks/Ennyw/flux?style=social)](https://github.com/Ennyw/flux)
 
-**75,000+ Movies & TV Shows • Netflix-Inspired UI • Zero Backend Required**
+**Netflix-Inspired UI • 75K+ Movies & TV Shows • Educational Demo Project**
 
-[Quick Start](#-quick-start) • [Features](#-features) • [Documentation](#-documentation) • [Contributing](#-contributing)
+[🚀 Quick Start](#-quick-start) • [✨ Features](#-features) • [📚 Documentation](#-documentation) • [🤝 Contributing](#-contributing)
+
+[![Made with React](https://img.shields.io/badge/Made%20with-React-61DAFB?logo=react)](https://reactjs.org/)
+[![Educational Purpose](https://img.shields.io/badge/Purpose-Educational-blue)](DISCLAIMER.md)
 
 </div>
 
