@@ -9,10 +9,13 @@ A Netflix-inspired streaming platform UI built with React, TypeScript, and Vite.
 
 <div align="center">
   <img src="screenshots/home.png" alt="Flux Home Page" width="800"/>
-  <p><em>Home page featuring featured content hero section</em></p>
+  <p><em>Home page with featured content hero section</em></p>
   
   <img src="screenshots/search.png" alt="Flux Search Page" width="800"/>
   <p><em>Advanced search with filters and trending content</em></p>
+  
+  <img src="screenshots/movies.png" alt="Flux Movies Page" width="800"/>
+  <p><em>Movies page with categorized content</em></p>
 </div>
 
 ## Features
