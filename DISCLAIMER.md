@@ -1,5 +1,9 @@
 # Legal Disclaimer
 
+## AI-Generated Project
+
+**This entire project was generated using AI-assisted development tools.** The codebase, documentation, and structure were created with the assistance of artificial intelligence (specifically, Cursor/Composer AI). 
+
 ## Educational Purpose Only
 
 This project, **Flux**, is an **educational demonstration** of modern web development techniques. It is designed to showcase:
@@ -24,20 +28,27 @@ This project uses third-party APIs and services:
 
 - **TMDB API**: Public movie/TV metadata API (requires free API key)
 - **TheSportsDB API**: Public sports data API
-- **Vidking API**: Third-party video streaming service
+- **ppv.to API**: Third-party video streaming service (accessed via VITE_STREAMS_API_URL)
 
 ### Important Third-Party Service Notice
 
+**⚠️ CRITICAL LEGAL NOTICE:**
+
+This application uses **ppv.to** (or other third-party streaming APIs) for video content. The developer explicitly disclaims:
+
 **By using this project, you acknowledge that:**
 
-1. **Video Content**: Video playback is handled entirely by Vidking API, a third-party service
-2. **No Control**: The developers have no control over what content Vidking streams
-3. **Terms of Service**: You are responsible for reading and complying with Vidking's terms of service
-4. **Content Legality**: You are responsible for verifying that content accessed through Vidking complies with applicable copyright laws
-5. **User Responsibility**: You are solely responsible for ensuring your use complies with all applicable laws
-6. **No Liability**: The developers are not liable for content accessed through third-party APIs
+1. **Video Content**: Video playback is handled entirely by ppv.to API or other third-party streaming services
+2. **No Control**: The developers have NO control, knowledge, or responsibility for what content these services stream
+3. **No Endorsement**: The developers do NOT endorse, verify, approve, or guarantee the legitimacy of ppv.to or any third-party streaming services
+4. **No Affiliation**: The developers have NO affiliation, partnership, or relationship with ppv.to or any streaming service providers
+5. **Terms of Service**: You are solely responsible for reading and complying with ppv.to's terms of service
+6. **Content Legality**: You are solely responsible for verifying that content accessed through these services complies with applicable copyright laws
+7. **User Responsibility**: You are solely responsible for ensuring your use complies with all applicable laws
+8. **No Liability**: The developers are NOT liable for any content accessed through third-party APIs
+9. **AI-Generated**: This project was AI-generated; the developer had no intent to facilitate any illegal activity
 
-**The developers do not endorse, verify, or guarantee the legitimacy of any third-party streaming services used by this application.**
+**THE DEVELOPER EXPLICITLY DISCLAIMS ALL RESPONSIBILITY FOR ANY CONTENT ACCESSED THROUGH THIRD-PARTY STREAMING SERVICES.**
 
 ## User Responsibility
 
@@ -74,10 +85,15 @@ This project complies with:
 
 **The developers explicitly disclaim:**
 
-- Any responsibility for content streamed through third-party services
+- Any responsibility for content streamed through third-party services (including ppv.to)
 - Any endorsement of third-party streaming services
 - Any guarantee of content legality or licensing
 - Any responsibility for user actions when using this application
+- Any knowledge of what content ppv.to or other services provide
+- Any control over third-party API functionality
+- Any liability for copyright infringement that may occur through use of third-party services
+
+**This is an AI-generated UI demonstration project. The developer is not responsible for what third-party APIs choose to stream.**
 
 ## Jurisdiction
 
@@ -87,6 +103,20 @@ Users are responsible for understanding and complying with copyright laws in the
 
 If you have concerns about this project, please open an issue on GitHub.
 
+## Developer Absolution
+
+**The developer of this project explicitly states:**
+
+1. This project was **AI-generated** using AI development tools
+2. The developer has **no knowledge** of what content ppv.to or other third-party services provide
+3. The developer has **no control** over third-party API responses or content
+4. The developer does **not endorse** any third-party streaming services
+5. The developer created this as a **technical/educational UI demonstration only**
+6. Any use of third-party services is **solely at the user's own risk**
+7. The developer is **absolved** of any responsibility for content accessed through third-party APIs
+
+**Legal Protection**: This project is an AI-generated educational demonstration. The developer is not responsible for the actions, content, or services of third-party APIs used by this application.
+
 ---
 
-**Remember**: This is a **UI/UX demonstration project** for **educational purposes only**. Always respect copyright laws and use streaming services legally. You are solely responsible for ensuring your use complies with all applicable laws.
+**Remember**: This is an **AI-generated UI/UX demonstration project** for **educational purposes only**. Always respect copyright laws and use streaming services legally. You are solely responsible for ensuring your use complies with all applicable laws. The developer has no control or responsibility for third-party services.

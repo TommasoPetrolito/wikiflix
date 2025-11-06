@@ -1,7 +1,7 @@
 {
   "name": "flux-streaming-platform",
   "version": "1.0.0",
-  "description": "A Netflix-inspired streaming platform UI built with React, TypeScript, and Vite. Educational demonstration project showcasing modern web development, API integration, and responsive design patterns.",
+  "description": "A Netflix-inspired streaming platform UI built with React, TypeScript, and Vite. AI-generated educational demonstration project. Uses ppv.to API for video streaming - developer has no control or responsibility for third-party API content.",
   "type": "module",
   "author": "",
   "license": "MIT",

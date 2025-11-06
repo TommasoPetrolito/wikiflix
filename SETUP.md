@@ -62,12 +62,18 @@ npm run preview
 
 ## Important Notice
 
-⚠️ **Third-Party Services**: This application uses Vidking API for video streaming. You are responsible for:
-- Verifying Vidking's terms of service
-- Ensuring compliance with copyright laws
-- Understanding that content is streamed through third-party services
+⚠️ **AI-Generated Project & Third-Party Services**: 
 
-**This project is intended for local/private use. Use responsibly.**
+- This entire project was **created using AI development tools** (AI-assisted)
+- This application uses **ppv.to API** (or other third-party APIs) for video streaming
+- The developer has **no control, knowledge, or responsibility** for what content these services provide
+- The developer does **not endorse** any third-party streaming services
+- You are **solely responsible** for:
+  - Verifying ppv.to's terms of service (or any other API used)
+  - Ensuring compliance with copyright laws
+  - Understanding that content is streamed through third-party services
+
+**This project is intended for local/private use only. The developer is absolved of all responsibility for third-party API content. Use responsibly.**
 
 ## Troubleshooting
 

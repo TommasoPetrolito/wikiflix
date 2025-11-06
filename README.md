@@ -77,13 +77,18 @@ This project uses third-party APIs:
 
 - **TMDB API** - Movie/TV metadata (free API key required)
 - **TheSportsDB API** - Sports data (optional)
-- **Vidking API** - Video streaming service
+- **ppv.to API** - Video streaming service (configured via VITE_STREAMS_API_URL)
 
-⚠️ **Important**: Video content is streamed through Vidking API, a third-party service. By using this application, you acknowledge that:
-- You are responsible for verifying Vidking's terms of service
-- You are responsible for compliance with all applicable copyright laws
-- The developers are not liable for content accessed through third-party APIs
+⚠️ **Critical Legal Notice**: 
+- This project was **AI-generated** using AI development tools
+- Video content is streamed through **ppv.to** (or other third-party APIs), which the developer has no control over
+- The developer has **no knowledge** of what content these services provide
+- The developer **does not endorse** any third-party streaming services
+- You are **solely responsible** for compliance with all applicable copyright laws
+- The developers are **absolved of all liability** for content accessed through third-party APIs
 - This project is intended for **local/private use** only
+
+**The developer is not responsible for third-party API content or services.**
 
 See [DISCLAIMER.md](DISCLAIMER.md) for complete legal information.
 
@@ -93,7 +98,11 @@ MIT License - see [LICENSE](LICENSE)
 
 ## Disclaimer
 
-This project is for **educational purposes only**. It is a UI/UX demonstration showcasing modern web development techniques. No copyrighted content is hosted or distributed. Users are solely responsible for compliance with all applicable laws, terms of service, and copyright regulations when using third-party APIs and services.
+**AI-Generated Project**: This entire project was created using AI-assisted development tools (Cursor/Composer AI).
+
+This project is for **educational purposes only**. It is a UI/UX demonstration showcasing modern web development techniques. No copyrighted content is hosted or distributed. 
+
+**The developer has no control, knowledge, or responsibility for content provided by third-party APIs (including ppv.to). Users are solely responsible for compliance with all applicable laws, terms of service, and copyright regulations when using third-party APIs and services.**
 
 ---
 
