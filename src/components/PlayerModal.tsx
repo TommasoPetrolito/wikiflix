@@ -1,10 +1,11 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Content, WatchProgress } from '@/types';
 import { getProgress, saveProgress, getIntroMarkers, saveIntroMarkers, clearIntroMarkers, toggleMyList, isInMyList } from '@/utils/storage';
 import { getSeasonEpisodes, TMDBEpisode, getCredits, TMDBCast, getRecommendations, getTVShowDetails, TMDBTVDetails } from '@/utils/tmdb';
 import { WatchParty } from './WatchParty';
 import { PlayerControls } from './PlayerControls';
-import { buildVidkingUrl } from '@/utils/vidking';
+import { buildVidkingUrl, getVidkingDomain, setVidkingDomain, getVidkingDomains, getStreamingProvider, setStreamingProvider } from '@/utils/vidking';
+import { buildVidSrcUrl, getVidSrcDomain, setVidSrcDomain, getVidSrcDomains } from '@/utils/vidsrc';
 import './PlayerModal.css';
 
 interface PlayerModalProps {
@@ -44,6 +45,87 @@ export const PlayerModal = ({ content, playerUrl, onClose }: PlayerModalProps) =
   const pendingSeekRef = useRef<number | null>(null);
   const hasSeenPlayerReadyRef = useRef(false);
   const hideControlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [playerError, setPlayerError] = useState<string | null>(null);
+  const [currentDomainIndex, setCurrentDomainIndex] = useState(0);
+  const domainAttemptRef = useRef(0);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [streamingProvider, setStreamingProviderState] = useState<'vidking' | 'vidsrc'>(getStreamingProvider());
+
+  // Switch streaming provider
+  const switchProvider = useCallback((newProvider: 'vidking' | 'vidsrc') => {
+    setStreamingProvider(newProvider);
+    setStreamingProviderState(newProvider);
+    setPlayerError(null);
+    domainAttemptRef.current = 0;
+    setCurrentDomainIndex(0);
+    
+    // Rebuild URL with new provider
+    if (content) {
+      if (content.type === 'tv') {
+        const newUrl = newProvider === 'vidsrc' 
+          ? buildVidSrcUrl(content, selectedSeason, selectedEpisode)
+          : buildEpisodeUrl(selectedSeason, selectedEpisode, false, false);
+        setCurrentPlayerUrl(newUrl);
+      } else {
+        const newUrl = newProvider === 'vidsrc'
+          ? buildVidSrcUrl(content)
+          : buildVidkingUrl(content);
+        setCurrentPlayerUrl(newUrl);
+      }
+    }
+  }, [content, selectedSeason, selectedEpisode]);
+
+  // Try next domain if current one fails
+  const tryNextDomain = useCallback(() => {
+    if (streamingProvider === 'vidsrc') {
+      // Try VidSrc domains
+      const domains = getVidSrcDomains();
+      const nextIndex = (currentDomainIndex + 1) % domains.length;
+      
+      if (nextIndex === 0 && domainAttemptRef.current >= domains.length) {
+        // Tried all VidSrc domains, switch to Vidking
+        switchProvider('vidking');
+        return;
+      }
+      
+      domainAttemptRef.current++;
+      setCurrentDomainIndex(nextIndex);
+      const nextDomain = domains[nextIndex];
+      setVidSrcDomain(nextDomain);
+      
+      if (content) {
+        const newUrl = buildVidSrcUrl(content, selectedSeason, selectedEpisode, nextDomain);
+        setCurrentPlayerUrl(newUrl);
+      }
+    } else {
+      // Try Vidking domains
+      const domains = getVidkingDomains();
+      const nextIndex = (currentDomainIndex + 1) % domains.length;
+      
+      if (nextIndex === 0 && domainAttemptRef.current >= domains.length) {
+        // Tried all Vidking domains, switch to VidSrc
+        switchProvider('vidsrc');
+        return;
+      }
+      
+      domainAttemptRef.current++;
+      setCurrentDomainIndex(nextIndex);
+      const nextDomain = domains[nextIndex];
+      setVidkingDomain(nextDomain);
+      
+      if (content) {
+        if (content.type === 'tv') {
+          const newUrl = buildEpisodeUrl(selectedSeason, selectedEpisode, false, false, nextDomain);
+          setCurrentPlayerUrl(newUrl);
+        } else {
+          const newUrl = buildVidkingUrl(content, undefined, undefined, nextDomain);
+          setCurrentPlayerUrl(newUrl);
+        }
+      }
+    }
+    
+    setPlayerError(null);
+  }, [content, selectedSeason, selectedEpisode, currentDomainIndex, streamingProvider, switchProvider]);
 
   // Get actual seasons from TMDB (filter out season 0 which is usually specials)
   const actualSeasons = tvShowDetails?.seasons?.filter(s => s.season_number > 0) || [];
@@ -65,20 +147,64 @@ export const PlayerModal = ({ content, playerUrl, onClose }: PlayerModalProps) =
     }, 3000);
   };
 
-  // Cleanup timer on unmount
+  // Cleanup timers on unmount
   useEffect(() => {
     return () => {
       if (hideControlsTimeoutRef.current) {
         clearTimeout(hideControlsTimeoutRef.current);
       }
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+      }
     };
   }, []);
 
+  // Detect iframe load errors and try fallback domains
+  useEffect(() => {
+    if (!iframeRef.current || !currentPlayerUrl) return;
+    
+    // Reset error state when URL changes
+    setPlayerError(null);
+    domainAttemptRef.current = 0;
+    
+    // Set a timeout to detect if player fails to load (15 seconds for first load)
+    loadTimeoutRef.current = setTimeout(() => {
+      // Check if iframe has loaded content
+      try {
+        const iframe = iframeRef.current;
+        if (iframe && iframe.contentWindow) {
+          // Try to access iframe content - if it fails, domain might be down
+          try {
+            // This will throw if cross-origin or if domain is down
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+            if (!iframeDoc || iframeDoc.readyState === 'loading') {
+              // Iframe might still be loading or blocked - try next domain
+              tryNextDomain();
+            }
+          } catch (e) {
+            // Cross-origin is expected, but if we get here and no player ready message,
+            // the domain might be down - wait a bit more before trying next domain
+          }
+        }
+      } catch (e) {
+        // Iframe access failed - try next provider/domain
+        tryNextDomain();
+      }
+    }, 15000); // 15 second timeout
+    
+    return () => {
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+      }
+    };
+  }, [currentPlayerUrl, tryNextDomain]);
+
   // Build player URL for a specific episode
-  const buildEpisodeUrl = (season: number, episode: number, enableNextEpisode: boolean = false, resumeProgress: boolean = false) => {
+  const buildEpisodeUrl = (season: number, episode: number, enableNextEpisode: boolean = false, resumeProgress: boolean = false, domainOverride?: string) => {
     if (!content || content.type !== 'tv') return playerUrl;
     
-    const baseUrl = `https://www.vidking.net/embed/tv/${content.id}/${season}/${episode}`;
+    const domain = domainOverride || getVidkingDomain();
+    const baseUrl = `https://${domain}/embed/tv/${content.id}/${season}/${episode}`;
     const params = new URLSearchParams({
       color: 'e50914',
       autoPlay: 'true',
@@ -352,6 +478,23 @@ export const PlayerModal = ({ content, playerUrl, onClose }: PlayerModalProps) =
       const parsed: any = typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return null; } })() : (raw && typeof raw === 'object' ? raw : null);
       if (!parsed || parsed.type !== 'PLAYER_EVENT') return;
       const data = parsed.data || {};
+      
+      // Clear error when player is ready (any play/timeupdate event means player loaded successfully)
+      if (data.event === 'play' || data.event === 'timeupdate') {
+        if (playerError) {
+          setPlayerError(null);
+        }
+        // Clear load timeout since player is working
+        if (loadTimeoutRef.current) {
+          clearTimeout(loadTimeoutRef.current);
+          loadTimeoutRef.current = null;
+        }
+      }
+      
+      // Detect when Vidking player loads but has no sources (shows "Select Source" screen)
+      if (data.event === 'error' || (data.sources && Array.isArray(data.sources) && data.sources.length === 0)) {
+        setPlayerError('No video sources available. Vidking servers may be experiencing issues.');
+      }
       
       // Check if player is ready and we have a pending seek
       if ((data.event === 'play' || data.event === 'timeupdate') && !hasSeenPlayerReadyRef.current && pendingSeekRef.current !== null) {
@@ -674,7 +817,14 @@ export const PlayerModal = ({ content, playerUrl, onClose }: PlayerModalProps) =
     };
   }, []);
 
-  if (!content) return null;
+  if (!content) {
+    if (import.meta.env.DEV) console.log('[PlayerModal] No content, not rendering');
+    return null;
+  }
+  
+  if (import.meta.env.DEV) {
+    console.log('[PlayerModal] Rendering with content:', content.title, 'URL:', currentPlayerUrl);
+  }
 
   // Format time for display
   const formatTime = (seconds: number): string => {
@@ -806,7 +956,65 @@ export const PlayerModal = ({ content, playerUrl, onClose }: PlayerModalProps) =
             referrerPolicy="no-referrer-when-downgrade"
             title={content.title}
             style={{ width: '100%', height: '100%', border: 'none' }}
+            onError={() => {
+              setPlayerError('Failed to load video player');
+              tryNextDomain();
+            }}
           />
+          
+          {playerError && (
+            <div className="player-error-overlay">
+              <div className="player-error-content">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '48px', height: '48px', marginBottom: '1rem', color: '#e50914' }}>
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <h3>Connection Error</h3>
+                <p>{playerError}</p>
+                <p style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.6)', marginTop: '0.5rem' }}>
+                  Current provider: {streamingProvider === 'vidsrc' ? 'VidSrc' : 'Vidking'}
+                </p>
+                <div style={{ marginTop: '1.5rem' }}>
+                  <p style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.5)', marginBottom: '0.5rem' }}>
+                    Switch streaming provider:
+                  </p>
+                  <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginBottom: '1rem' }}>
+                    <button
+                      className={`btn-modal ${streamingProvider === 'vidsrc' ? 'btn-play' : 'btn-secondary'}`}
+                      onClick={() => switchProvider('vidsrc')}
+                    >
+                      VidSrc {streamingProvider === 'vidsrc' && '(Current)'}
+                    </button>
+                    <button
+                      className={`btn-modal ${streamingProvider === 'vidking' ? 'btn-play' : 'btn-secondary'}`}
+                      onClick={() => switchProvider('vidking')}
+                    >
+                      Vidking {streamingProvider === 'vidking' && '(Current)'}
+                    </button>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                  <button 
+                    className="btn-modal btn-play"
+                    onClick={() => {
+                      setPlayerError(null);
+                      domainAttemptRef.current = 0;
+                      tryNextDomain();
+                    }}
+                  >
+                    Auto-Retry
+                  </button>
+                  <button 
+                    className="btn-modal btn-secondary"
+                    onClick={onClose}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           
           {showControls && (
             <PlayerControls

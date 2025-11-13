@@ -246,6 +246,43 @@
   border: none;
 }
 
+/* Player Error Overlay */
+.player-error-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(10px);
+}
+
+.player-error-content {
+  text-align: center;
+  padding: 3rem;
+  max-width: 500px;
+  color: #ffffff;
+}
+
+.player-error-content h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem 0;
+  color: #ffffff;
+}
+
+.player-error-content p {
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.player-error-content .btn-modal {
+  min-width: 120px;
+}
+
 /* Fullscreen styles */
 .player-container:fullscreen,
 .player-container:-webkit-full-screen,
