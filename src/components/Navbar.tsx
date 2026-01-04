@@ -58,7 +58,7 @@ export const Navbar = ({ currentCategory, onCategoryChange, searchQuery, onSearc
           className="nav-brand"
           tabIndex={0}
           role="button"
-          aria-label="Flux Home"
+          aria-label="Wikiflix Home"
           onClick={handleHomeClick}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -67,7 +67,7 @@ export const Navbar = ({ currentCategory, onCategoryChange, searchQuery, onSearc
             }
           }}
         >
-          Flux
+          Wikiflix
         </div>
         
         <div className="nav-links" ref={linksRef as any} tabIndex={0}>

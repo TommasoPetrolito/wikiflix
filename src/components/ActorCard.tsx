@@ -1,9 +1,16 @@
-import { TMDBActor } from '@/utils/tmdb';
 import './ActorCard.css';
 
+export interface PersonCardData {
+  id: string | number;
+  name: string;
+  profile_path?: string | null;
+  known_for_department?: string | null;
+  known_for?: Array<{ title?: string; name?: string }>;
+}
+
 interface ActorCardProps {
-  actor: TMDBActor;
-  onClick: (actor: TMDBActor) => void;
+  actor: PersonCardData;
+  onClick: (actor: PersonCardData) => void;
 }
 
 export const ActorCard = ({ actor, onClick }: ActorCardProps) => {

@@ -1,7 +1,5 @@
-import { memo, useState, useEffect, useRef } from 'react';
+import { memo, useMemo } from 'react';
 import { Stream } from '@/types';
-import { isStreamLive, isStreamUpcoming, formatStreamTime } from '@/utils/streams';
-import { getTeamLogosFromTitle, TeamLogoData } from '@/utils/sportsdb';
 import './StreamCard.css';
 
 interface StreamCardProps {
@@ -10,78 +8,30 @@ interface StreamCardProps {
 }
 
 export const StreamCard = memo(({ stream, onClick }: StreamCardProps) => {
-  const live = isStreamLive(stream);
-  const upcoming = isStreamUpcoming(stream);
-  const [teamLogos, setTeamLogos] = useState<TeamLogoData | null>(null);
-  const [, setLogosLoading] = useState(false);
-  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
-  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
-  const loadingRef = useRef<Set<string>>(new Set());
+  const live = useMemo(() => {
+    if (stream.always_live) return true;
+    if (!stream.starts_at || !stream.ends_at) return false;
+    const now = Date.now();
+    const start = new Date(stream.starts_at).getTime();
+    const end = new Date(stream.ends_at).getTime();
+    return now >= start && now <= end;
+  }, [stream.always_live, stream.starts_at, stream.ends_at]);
 
-  // Preload and verify background images load successfully
-  useEffect(() => {
-    if (!teamLogos) return;
+  const upcoming = useMemo(() => {
+    if (live || !stream.starts_at) return false;
+    const start = new Date(stream.starts_at).getTime();
+    return Date.now() < start;
+  }, [live, stream.starts_at]);
 
-    const preloadImage = (url: string, teamKey: 'teamA' | 'teamB') => {
-      if (!url || loadingRef.current.has(url) || loadedImages.has(url) || failedImages.has(url)) {
-        return;
-      }
-
-      loadingRef.current.add(url);
-      const img = new Image();
-      img.onload = () => {
-        loadingRef.current.delete(url);
-        setLoadedImages(prev => {
-          const newSet = new Set(prev);
-          newSet.add(url);
-          return newSet;
-        });
-      };
-      img.onerror = () => {
-        loadingRef.current.delete(url);
-        console.warn(`[StreamCard] Failed to load background image for ${teamKey}:`, url);
-        setFailedImages(prev => {
-          const newSet = new Set(prev);
-          newSet.add(url);
-          return newSet;
-        });
-      };
-      img.src = url;
-    };
-
-    if (teamLogos.teamA.background) {
-      preloadImage(teamLogos.teamA.background, 'teamA');
-    }
-    if (teamLogos.teamB.background) {
-      preloadImage(teamLogos.teamB.background, 'teamB');
-    }
-  }, [teamLogos, loadedImages, failedImages]);
-
-  // Fetch team logos when component mounts - always try to get logos for sports streams
-  useEffect(() => {
-    const fetchLogos = async () => {
-      // Always try to fetch team logos for sports streams
-      if (stream.name) {
-        setLogosLoading(true);
-        setLoadedImages(new Set());
-        setFailedImages(new Set());
-        try {
-          const logos = await getTeamLogosFromTitle(stream.name);
-          if (logos && (logos.teamA.logo || logos.teamB.logo)) {
-            setTeamLogos(logos);
-          }
-        } catch (error) {
-          // Silently fail - CORS issues are expected
-        } finally {
-          setLogosLoading(false);
-        }
-      }
-    };
-
-    fetchLogos();
-  }, [stream.name]);
-
-  const hasTeamLogos = teamLogos && (teamLogos.teamA.logo || teamLogos.teamB.logo);
+  const formattedTime = useMemo(() => {
+    if (!stream.starts_at) return '';
+    return new Date(stream.starts_at).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }, [stream.starts_at]);
   
   return (
     <div 
@@ -98,60 +48,7 @@ export const StreamCard = memo(({ stream, onClick }: StreamCardProps) => {
       }}
     >
       <div className="stream-card-image-container">
-        {hasTeamLogos ? (
-          <div className="stream-card-team-logos">
-            {/* Background images for each team - show immediately, hide if they fail */}
-            {teamLogos.teamA.background && !failedImages.has(teamLogos.teamA.background) && (
-              <div 
-                className="team-background team-background-left"
-                style={{ 
-                  backgroundImage: `url(${teamLogos.teamA.background})`,
-                  opacity: loadedImages.has(teamLogos.teamA.background) ? 0.65 : 0.3
-                }}
-              />
-            )}
-            {teamLogos.teamB.background && !failedImages.has(teamLogos.teamB.background) && (
-              <div 
-                className="team-background team-background-right"
-                style={{ 
-                  backgroundImage: `url(${teamLogos.teamB.background})`,
-                  opacity: loadedImages.has(teamLogos.teamB.background) ? 0.65 : 0.3
-                }}
-              />
-            )}
-            
-            {/* Overlay for better logo visibility */}
-            <div className="stream-card-team-logos-overlay"></div>
-            
-            {teamLogos.teamA.logo && (
-              <div className="team-logo-wrapper">
-                <img 
-                  src={teamLogos.teamA.logo} 
-                  alt={teamLogos.teamA.name}
-                  className="team-logo"
-                  loading="lazy"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
-              </div>
-            )}
-            <div className="team-logos-vs">VS</div>
-            {teamLogos.teamB.logo && (
-              <div className="team-logo-wrapper">
-                <img 
-                  src={teamLogos.teamB.logo} 
-                  alt={teamLogos.teamB.name}
-                  className="team-logo"
-                  loading="lazy"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
-              </div>
-            )}
-          </div>
-        ) : stream.poster ? (
+        {stream.poster ? (
           <img 
             src={stream.poster} 
             alt={stream.name}
@@ -188,7 +85,7 @@ export const StreamCard = memo(({ stream, onClick }: StreamCardProps) => {
           {upcoming && (
             <>
               <span>•</span>
-              <span className="stream-time">{formatStreamTime(stream.starts_at)}</span>
+              <span className="stream-time">{formattedTime}</span>
             </>
           )}
         </div>

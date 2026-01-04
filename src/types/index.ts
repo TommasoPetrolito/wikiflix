@@ -8,6 +8,8 @@ export interface Content {
   description: string;
   videoUrl?: string;
   subtitles?: string;
+  genres?: string[];
+  cast?: string[];
   season?: number;
   episode?: number;
 }

@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Content, Category } from '@/types';
-import { searchTMDB } from '@/utils/tmdb';
-import { buildVidkingUrl } from '@/utils/vidking';
+import { searchTMDB } from '@/utils/wikidataAdapter';
 import { ContentCard } from '@/components/ContentCard';
 import { PlayerModal } from '@/components/PlayerModal';
 import { Navbar } from '@/components/Navbar';
@@ -36,7 +35,6 @@ export default function AIPage() {
   const recGridRef = useReactRef<HTMLDivElement>(null);
   const suggGridRef = useReactRef<HTMLDivElement>(null);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
-  const [playerUrl, setPlayerUrl] = useState('');
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -218,12 +216,10 @@ export default function AIPage() {
 
   const handlePlayContent = (content: Content) => {
     setSelectedContent(content);
-    setPlayerUrl(buildVidkingUrl(content));
   };
 
   const handleClosePlayer = () => {
     setSelectedContent(null);
-    setPlayerUrl('');
   };
 
   const suggestions = [
@@ -372,7 +368,6 @@ export default function AIPage() {
 
       <PlayerModal
         content={selectedContent}
-        playerUrl={playerUrl}
         onClose={handleClosePlayer}
       />
     </div>

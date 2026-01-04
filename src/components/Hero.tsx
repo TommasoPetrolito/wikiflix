@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { Content } from '@/types';
-import { getBackdropUrl } from '@/data/content';
 import './Hero.css';
 
 interface HeroProps {
@@ -14,6 +13,13 @@ export const Hero = ({ content, onPlay, onInfo }: HeroProps) => {
   const [isPaused, setIsPaused] = useState(false);
   const [isContentTransitioning, setIsContentTransitioning] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Reset slide index when content changes length
+  useEffect(() => {
+    if (currentSlide >= content.length) {
+      setCurrentSlide(0);
+    }
+  }, [content.length, currentSlide]);
 
   // Auto-advance slides every 5 seconds (paused on hover)
   useEffect(() => {
@@ -69,7 +75,9 @@ export const Hero = ({ content, onPlay, onInfo }: HeroProps) => {
 
   if (content.length === 0) return null;
 
-  const currentContent = content[currentSlide];
+  const safeIndex = Math.min(currentSlide, Math.max(0, content.length - 1));
+  const currentContent = content[safeIndex];
+  if (!currentContent) return null;
 
   return (
     <section 
@@ -80,23 +88,8 @@ export const Hero = ({ content, onPlay, onInfo }: HeroProps) => {
       {/* Slides Container */}
       <div className="hero-slides">
         {content.map((item, index) => {
-          // Normalize backdrop path - ensure it starts with /
-          const backdropPath = item.backdrop && item.backdrop !== '/placeholder.jpg' 
-            ? (item.backdrop.startsWith('/') ? item.backdrop : `/${item.backdrop}`)
-            : null;
-          
-          const backdropUrl = backdropPath ? getBackdropUrl(backdropPath) : '';
-          
-          // Debug logging (only in dev mode, only for first slide)
-          if (import.meta.env.DEV && index === 0) {
-            console.log('Hero slide data:', {
-              title: item.title,
-              backdrop: item.backdrop,
-              backdropPath,
-              backdropUrl,
-            });
-          }
-          
+          const backdropUrl = item.backdrop || '';
+
           return (
             <div
               key={`${item.id}-${index}`}
@@ -202,6 +195,12 @@ export const Hero = ({ content, onPlay, onInfo }: HeroProps) => {
           <span>{currentContent.year}</span>
           <span className="separator">•</span>
           <span>{currentContent.type === 'movie' ? 'Movie' : 'TV Series'}</span>
+          {currentContent.genres?.length ? (
+            <>
+              <span className="separator">•</span>
+              <span>{currentContent.genres.slice(0, 2).join(', ')}</span>
+            </>
+          ) : null}
           {content.length > 1 && (
             <>
               <span className="separator">•</span>

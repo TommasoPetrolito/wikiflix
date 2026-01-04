@@ -1,7 +1,39 @@
 import { setCached, getCached } from './cache';
 
-const WIKIDATA_SPARQL_ENDPOINT = 'https://query.wikidata.org/sparql';
+const DEFAULT_SPARQL_ENDPOINT = 'https://query.wikidata.org/sparql';
+const WIKIDATA_SPARQL_ENDPOINT = typeof window !== 'undefined' && import.meta.env.DEV
+  ? '/sparql'
+  : DEFAULT_SPARQL_ENDPOINT;
 const DEFAULT_TTL = 1000 * 60 * 30; // 30 minutes
+const MAX_RETRIES = 1;
+const BASE_DELAY_MS = 2000;
+const MIN_INTERVAL_MS = 5000; // even stricter throttle between successive queries to avoid 429s
+const REQUEST_TIMEOUT_MS = 15000;
+let lastRequestAt = 0;
+let requestMutex: Promise<void> = Promise.resolve();
+
+const acquireSlot = async () => {
+  let release!: () => void;
+  const previous = requestMutex;
+  requestMutex = new Promise((resolve) => {
+    release = resolve;
+  });
+  await previous;
+  return release;
+};
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const readStaleCache = <T>(key: string): T | null => {
+  try {
+    const raw = window.localStorage.getItem(`${'wikiflix_cache:'}${key}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.data as T;
+  } catch {
+    return null;
+  }
+};
 
 export interface WikidataMedia {
   id: string; // e.g., Q11424
@@ -48,24 +80,64 @@ const fetchSparql = async <T>(query: string, cacheKey: string, ttlMs = DEFAULT_T
   const cached = getCached<T[]>(cacheKey);
   if (cached) return cached;
 
-  const url = `${WIKIDATA_SPARQL_ENDPOINT}?format=json&query=${encodeURIComponent(query)}`;
-  const res = await fetch(url, {
-    headers: {
-      Accept: 'application/sparql-results+json',
-      'User-Agent': 'wikiflix/1.0 (https://github.com/TommasoPetrolito/wikiflix)',
-    },
-  });
+  const url = WIKIDATA_SPARQL_ENDPOINT;
 
-  if (!res.ok) {
-    throw new Error(`Wikidata SPARQL error: ${res.status}`);
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      const release = await acquireSlot();
+      try {
+        const sinceLast = Date.now() - lastRequestAt;
+        if (sinceLast < MIN_INTERVAL_MS) {
+          await delay(MIN_INTERVAL_MS - sinceLast + Math.random() * 200);
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort('timeout'), REQUEST_TIMEOUT_MS + Math.random() * 2000);
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/sparql-results+json',
+            'Content-Type': 'application/sparql-query',
+          },
+          body: query,
+          signal: controller.signal,
+        });
+        lastRequestAt = Date.now();
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+          lastError = new Error(`Wikidata SPARQL error: ${res.status}`);
+          if (res.status === 429 || res.status === 503) {
+            await delay(BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 400);
+            continue;
+          }
+          throw lastError;
+        }
+
+        const json = await res.json();
+        const bindings = json?.results?.bindings ?? [];
+        const mapped = bindings.map((b: any) => mapBindingToMedia(b));
+        const merged = mergeMedia(mapped);
+        setCached(cacheKey, merged as T[], ttlMs);
+        return merged as T[];
+      } finally {
+        release();
+      }
+    } catch (err) {
+      lastError = err;
+      await delay(BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 400);
+    }
   }
 
-  const json = await res.json();
-  const bindings = json?.results?.bindings ?? [];
-  const mapped = bindings.map((b: any) => mapBindingToMedia(b));
-  const merged = mergeMedia(mapped);
-  setCached(cacheKey, merged as T[], ttlMs);
-  return merged as T[];
+  const stale = readStaleCache<T[]>(cacheKey);
+  if (stale) {
+    console.warn('Using stale Wikidata cache for', cacheKey, lastError);
+    return stale;
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Wikidata fetch failed');
 };
 
 const mapBindingToMedia = (b: any): WikidataMedia => {
@@ -95,8 +167,8 @@ const mapBindingToMedia = (b: any): WikidataMedia => {
 
 export const fetchPublicDomainFilms = async (limit = 100) => {
   const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles ?publicationDate ?sitelinks ?genreLabel ?castLabel WHERE {
-    ?item wdt:P31 wd:Q11424;
-          wdt:P10 ?video.
+    ?item wdt:P31 wd:Q11424.
+    OPTIONAL { ?item wdt:P10 ?video. }
     OPTIONAL { ?item wdt:P18 ?image. }
     OPTIONAL { ?item wdt:P1173 ?subtitles. }
     OPTIONAL { ?item wdt:P577 ?publicationDate. }
@@ -116,8 +188,8 @@ export const searchByTitle = async (queryText: string, limit = 50) => {
   const safeQuery = queryText.trim();
   if (!safeQuery) return [] as WikidataMedia[];
   const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles ?publicationDate ?sitelinks ?genreLabel ?castLabel WHERE {
-    ?item wdt:P31 wd:Q11424;
-          wdt:P10 ?video.
+    ?item wdt:P31 wd:Q11424.
+    OPTIONAL { ?item wdt:P10 ?video. }
     SERVICE wikibase:label { bd:serviceParam wikibase:language "it,en". }
     OPTIONAL { ?item wdt:P18 ?image. }
     OPTIONAL { ?item wdt:P1173 ?subtitles. }
@@ -133,8 +205,8 @@ export const searchByTitle = async (queryText: string, limit = 50) => {
 
 export const fetchRandomSet = async (limit = 40) => {
   const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles ?publicationDate ?sitelinks ?genreLabel ?castLabel WHERE {
-    ?item wdt:P31 wd:Q11424;
-          wdt:P10 ?video.
+    ?item wdt:P31 wd:Q11424.
+    OPTIONAL { ?item wdt:P10 ?video. }
     OPTIONAL { ?item wdt:P18 ?image. }
     OPTIONAL { ?item wdt:P1173 ?subtitles. }
     OPTIONAL { ?item wdt:P577 ?publicationDate. }
@@ -152,8 +224,8 @@ export const fetchRandomSet = async (limit = 40) => {
 export const fetchPopular = async (limit = 40) => {
   const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles ?publicationDate ?sitelinks ?genreLabel ?castLabel WHERE {
     ?item wdt:P31 wd:Q11424;
-          wdt:P10 ?video;
-          wikibase:sitelinks ?sitelinks.
+      wikibase:sitelinks ?sitelinks.
+    OPTIONAL { ?item wdt:P10 ?video. }
     OPTIONAL { ?item wdt:P18 ?image. }
     OPTIONAL { ?item wdt:P1173 ?subtitles. }
     OPTIONAL { ?item wdt:P577 ?publicationDate. }
@@ -171,8 +243,8 @@ export const fetchPopular = async (limit = 40) => {
 export const fetchRecentlyAdded = async (limit = 40) => {
   const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles ?publicationDate ?sitelinks ?genreLabel ?castLabel WHERE {
     ?item wdt:P31 wd:Q11424;
-          wdt:P10 ?video;
-          wdt:P577 ?publicationDate.
+      wdt:P577 ?publicationDate.
+    OPTIONAL { ?item wdt:P10 ?video. }
     OPTIONAL { ?item wdt:P18 ?image. }
     OPTIONAL { ?item wdt:P1173 ?subtitles. }
     OPTIONAL { ?item wikibase:sitelinks ?sitelinks. }
@@ -193,8 +265,8 @@ export const fetchByGenre = async (genreQid: string, limit = 60) => {
   const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles ?publicationDate ?sitelinks ?genreLabel ?castLabel WHERE {
     VALUES ?genre { wd:${safeGenre} }
     ?item wdt:P31 wd:Q11424;
-          wdt:P10 ?video;
           wdt:P136 ?genre.
+    OPTIONAL { ?item wdt:P10 ?video. }
     OPTIONAL { ?item wdt:P18 ?image. }
     OPTIONAL { ?item wdt:P1173 ?subtitles. }
     OPTIONAL { ?item wdt:P577 ?publicationDate. }
@@ -218,8 +290,8 @@ export const fetchRelatedByCastOrGenre = async (anchorQid: string, limit = 60) =
     ?anchor wdt:P136 ?anchorGenre.
     OPTIONAL { ?anchor wdt:P161 ?anchorCast. }
 
-    ?item wdt:P31 wd:Q11424;
-          wdt:P10 ?video.
+    ?item wdt:P31 wd:Q11424.
+    OPTIONAL { ?item wdt:P10 ?video. }
     OPTIONAL { ?item wdt:P18 ?image. }
     OPTIONAL { ?item wdt:P1173 ?subtitles. }
     OPTIONAL { ?item wdt:P577 ?publicationDate. }

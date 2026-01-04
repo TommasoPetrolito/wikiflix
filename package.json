@@ -34,17 +34,17 @@
     "get-ip": "./get-ip.sh"
   },
   "dependencies": {
+    "framer-motion": "^10.16.16",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.20.0",
-    "framer-motion": "^10.16.16"
+    "react-router-dom": "^6.20.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.1",
+    "baseline-browser-mapping": "^2.9.11",
     "typescript": "^5.2.2",
-    "vite": "^5.0.8"
+    "vite": "^7.3.0"
   }
 }
-

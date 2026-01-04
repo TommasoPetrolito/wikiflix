@@ -3,10 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar';
 import { ContentGrid } from '@/components/ContentGrid';
 import { PlayerModal } from '@/components/PlayerModal';
-import { ActorCard } from '@/components/ActorCard';
 import { Content, Category } from '@/types';
-import { searchTMDBWithActors, getByGenre, getTrendingMovies, getTrendingTV, getContentByPerson, getPersonDetails, TMDBActor, TMDBPersonDetails } from '@/utils/tmdb';
-import { buildVidkingUrl } from '@/utils/vidking';
+import { searchTMDB, getByGenre, getTrendingMovies, getTrendingTV } from '@/utils/wikidataAdapter';
 import { addToContinueWatching } from '@/utils/storage';
 import './SearchPage.css';
 
@@ -78,14 +76,8 @@ export default function SearchPage() {
   const [yearTo, setYearTo] = useState<number | ''>('');
   const [sortBy, setSortBy] = useState<'relevance' | 'year' | 'title'>('relevance');
   const [results, setResults] = useState<Content[]>([]);
-  const [actorResults, setActorResults] = useState<TMDBActor[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
-  const [selectedActor, setSelectedActor] = useState<TMDBActor | null>(null);
-  const [actorContent, setActorContent] = useState<Content[]>([]);
-  const [isLoadingActorContent, setIsLoadingActorContent] = useState(false);
-  const [actorDetails, setActorDetails] = useState<TMDBPersonDetails | null>(null);
-  const [, setIsLoadingActorDetails] = useState(false);
   const [, setShowSuggestions] = useState(false);
   const [trendingContent, setTrendingContent] = useState<Content[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -113,33 +105,6 @@ export default function SearchPage() {
     setSelectedContent(null);
   };
 
-  const handleActorClick = async (actor: TMDBActor) => {
-    setSelectedActor(actor);
-    setIsLoadingActorContent(true);
-    setIsLoadingActorDetails(true);
-    try {
-      const [content, details] = await Promise.all([
-        getContentByPerson(actor.id),
-        getPersonDetails(actor.id)
-      ]);
-      setActorContent(content);
-      setActorDetails(details);
-    } catch (error) {
-      console.error('Error loading actor content:', error);
-      setActorContent([]);
-      setActorDetails(null);
-    } finally {
-      setIsLoadingActorContent(false);
-      setIsLoadingActorDetails(false);
-    }
-  };
-
-  const handleCloseActorView = () => {
-    setSelectedActor(null);
-    setActorContent([]);
-    setActorDetails(null);
-  };
-
   // Sync URL with search query
   useEffect(() => {
     const params = new URLSearchParams();
@@ -159,7 +124,6 @@ export default function SearchPage() {
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
     if (!q.trim()) { 
       setResults([]);
-      setActorResults([]);
       // If genre filter is active, load by genre instead
       if (genreFilter && typeFilter !== 'all') {
         setIsSearching(true);
@@ -173,12 +137,10 @@ export default function SearchPage() {
     setIsSearching(true);
     debounceRef.current = window.setTimeout(async () => {
       try {
-        const searchResults = await searchTMDBWithActors(q.trim());
-        setResults(searchResults.content);
-        setActorResults(searchResults.actors);
+        const searchResults = await searchTMDB(q.trim());
+        setResults(searchResults);
       } catch {
         setResults([]);
-        setActorResults([]);
       } finally {
         setIsSearching(false);
       }
@@ -210,12 +172,10 @@ export default function SearchPage() {
     return items;
   }, [results, typeFilter, yearFrom, yearTo, sortBy]);
 
-  // Sort actors by popularity (most popular first)
-  const sortedActors = useMemo(() => {
-    return [...actorResults].sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
-  }, [actorResults]);
-
   const currentGenres = typeFilter === 'all' ? [...GENRES.movie, ...GENRES.tv] : GENRES[typeFilter];
+  const uniqueGenres = currentGenres.filter((g, idx, arr) =>
+    arr.findIndex((x) => x.id === g.id && x.name === g.name) === idx
+  );
 
   return (
     <div className="app">
@@ -314,45 +274,6 @@ export default function SearchPage() {
                 </div>
               </div>
               
-              {/* Actor Profile Section - Inline with search */}
-              {selectedActor && actorDetails && (
-                <div className="actor-profile-section-inline">
-                  {actorDetails.profile_path && (
-                    <div className="actor-profile-image">
-                      <img 
-                        src={`https://image.tmdb.org/t/p/w185${actorDetails.profile_path}`}
-                        alt={actorDetails.name}
-                        loading="lazy"
-                      />
-                    </div>
-                  )}
-                  <div className="actor-profile-info">
-                    {actorDetails.birthday && (
-                      <div className="actor-profile-item">
-                        <span className="actor-profile-label">Born:</span>
-                        <span className="actor-profile-value">
-                          {new Date(actorDetails.birthday).toLocaleDateString('en-US', { 
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric' 
-                          })}
-                          {actorDetails.place_of_birth && ` in ${actorDetails.place_of_birth}`}
-                        </span>
-                      </div>
-                    )}
-                    {actorDetails.biography && (
-                      <div className="actor-profile-item">
-                        <span className="actor-profile-label">Bio:</span>
-                        <p className="actor-profile-bio">
-                          {actorDetails.biography.length > 150 
-                            ? `${actorDetails.biography.substring(0, 150)}...` 
-                            : actorDetails.biography}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
             
             {/* Filters */}
@@ -375,7 +296,7 @@ export default function SearchPage() {
             </div>
           </div>
 
-          {currentGenres.length > 0 && (
+          {uniqueGenres.length > 0 && (
             <div className="filter-group">
               <label>Genre</label>
               <select
@@ -384,8 +305,8 @@ export default function SearchPage() {
                 className="genre-select"
               >
                 <option value="">All Genres</option>
-                {currentGenres.map(g => (
-                  <option key={g.id} value={g.id}>{g.name}</option>
+                {uniqueGenres.map(g => (
+                  <option key={`${g.id}-${g.name}`} value={g.id}>{g.name}</option>
                 ))}
               </select>
             </div>
@@ -477,54 +398,8 @@ export default function SearchPage() {
           </div>
         )}
 
-        {/* Actor Results */}
-        {!isSearching && actorResults.length > 0 && !selectedActor && (
-          <div className="results-section">
-            <div className="results-header">
-              <h2>People</h2>
-              <span className="results-count">{actorResults.length} {actorResults.length === 1 ? 'person' : 'people'}</span>
-            </div>
-            <div className="actors-grid">
-              {sortedActors.map((actor) => (
-                <ActorCard
-                  key={actor.id}
-                  actor={actor}
-                  onClick={handleActorClick}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Actor Content View */}
-        {selectedActor && (
-          <div className="results-section">
-            <div className="results-header">
-              <button className="back-button" onClick={handleCloseActorView}>
-                ← Back to Search
-              </button>
-            </div>
-            {isLoadingActorContent ? (
-              <div className="search-status">
-                <div className="loading-spinner"></div>
-                <span>Loading content...</span>
-              </div>
-            ) : actorContent.length > 0 ? (
-              <ContentGrid
-                title=""
-                items={actorContent}
-                onCardClick={handlePlayContent}
-              />
-            ) : (
-              <div className="search-status">
-                <p className="no-results">No content found for {selectedActor.name}</p>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Content Results */}
-        {filtered.length > 0 && !selectedActor && (
+        {filtered.length > 0 && (
           <div className="results-section">
             <div className="results-header">
               <h2>{q.trim() ? `Movies & TV Shows` : 'Browse by Genre'}</h2>
@@ -541,7 +416,6 @@ export default function SearchPage() {
 
       <PlayerModal
         content={selectedContent}
-        playerUrl={selectedContent ? buildVidkingUrl(selectedContent) : ''}
         onClose={handleClosePlayer}
       />
     </div>

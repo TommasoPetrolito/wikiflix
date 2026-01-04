@@ -3,19 +3,30 @@ import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { ContentGrid } from './components/ContentGrid';
 import { ContentSquareGrid } from './components/ContentSquareGrid';
-import { Top10Grid } from './components/Top10Grid';
 import { PlayerModal } from './components/PlayerModal';
 import { SectionSkeleton } from './components/SectionSkeleton';
 import { StreamCard } from './components/StreamCard';
 import { Content, Category, Stream } from './types';
-import { trendingMovies, popularTV, actionMovies } from './data/content';
 import { addToContinueWatching, getContinueWatching, migrateKnownFixes, getMyList } from './utils/storage';
 import { usePlayerTracking } from './hooks/usePlayerTracking';
 import { useTVNavigation } from './hooks/useTVNavigation';
 import { searchTMDB, getTrendingMovies, getTopRatedMovies, getTopRatedTV, getTop10, getByGenre, getTrendingTV, getRecommendations, getUpcomingMovies, getCriticallyAcclaimed, getHiddenGems, getTrendingToday, getMoviesByActor, findCollectionByMovie, getRecentlyAdded, getForYouContent, getLiveStreams } from './utils/wikidataAdapter';
 import { MoodSelector } from './components/MoodSelector';
-import { ApiKeyWarning } from './components/ApiKeyWarning';
 import './App.css';
+
+const FALLBACK_CONTENT: Content = {
+  id: 'fallback-clockwork',
+  title: 'A Clockwork Orange (Trailer)',
+  type: 'movie',
+  year: 1971,
+  poster: 'https://commons.wikimedia.org/wiki/Special:FilePath/Clockwork%20Orange%20Trailer%20poster.png',
+  backdrop: 'https://commons.wikimedia.org/wiki/Special:FilePath/Bergman%20%26%20Bogart%20Casablanca%20still.jpg',
+  description: 'Fallback trailer from Wikimedia Commons.',
+  videoUrl: 'https://upload.wikimedia.org/wikipedia/commons/8/87/A_Clockwork_Orange_%281971%29_-_Trailer.webm',
+  subtitles: undefined,
+  genres: ['Drama'],
+  cast: [],
+};
 
 function App() {
   const [currentCategory, setCurrentCategory] = useState<Category>('all');
@@ -24,7 +35,8 @@ function App() {
   const [continueWatching, setContinueWatching] = useState<Content[]>(getContinueWatching());
   const [searchResults, setSearchResults] = useState<Content[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [heroContent, setHeroContent] = useState<Content | null>(null);
+  const [heroContent, setHeroContent] = useState<Content | null>(FALLBACK_CONTENT);
+  const [trendingMovies, setTrendingMovies] = useState<Content[]>([]);
   const [isLoadingHero, setIsLoadingHero] = useState(false);
   const [rowAction, setRowAction] = useState<Content[]>([]);
   const [rowComedy, setRowComedy] = useState<Content[]>([]);
@@ -242,6 +254,25 @@ function App() {
     loadRows();
   }, []);
 
+  // Load trending content for hero and rows
+  useEffect(() => {
+    const loadTrending = async () => {
+      try {
+        const [movies, tv] = await Promise.all([
+          getTrendingMovies(),
+          getTrendingTV(),
+        ]);
+        const combined = [...movies, ...tv];
+        setTrendingMovies(combined.length > 0 ? combined : [FALLBACK_CONTENT]);
+      } catch (error) {
+        console.error('Error loading trending content:', error);
+        setTrendingMovies([FALLBACK_CONTENT]);
+      }
+    };
+
+    loadTrending();
+  }, []);
+
   const handleMoodSelect = (moodTitle: string, content: Content[]) => {
     setRowMoodContent({ title: moodTitle, items: content });
     // Scroll to mood content
@@ -273,9 +304,12 @@ function App() {
           // Pick a random one from the first 5 for variety
           const randomIndex = Math.floor(Math.random() * Math.min(5, content.length));
           setHeroContent(content[randomIndex]);
+        } else {
+          setHeroContent(FALLBACK_CONTENT);
         }
       } catch (error) {
         console.error('Error loading hero content:', error);
+        setHeroContent(FALLBACK_CONTENT);
       } finally {
         setIsLoadingHero(false);
       }
@@ -315,32 +349,17 @@ function App() {
 
   // Filter content based on category and search
   const filteredContent = useMemo(() => {
-      const filterByCategory = (items: Content[]) => {
-        if (currentCategory === 'movies') return items.filter(i => i.type === 'movie');
-        if (currentCategory === 'tv') return items.filter(i => i.type === 'tv');
-        return items;
-      };
-
-    // If user is searching, show search results
-    if (searchQuery.trim() && searchResults.length > 0) {
-      return {
-        trending: filterByCategory(searchResults),
-        tv: [],
-        action: [],
-        continue: filterByCategory(continueWatching),
-      };
-    }
-
-    // Otherwise show featured content
-    return {
-      trending: filterByCategory(trendingMovies),
-      tv: currentCategory !== 'movies' ? filterByCategory(popularTV) : [],
-      action: filterByCategory(actionMovies),
-      continue: filterByCategory(continueWatching),
+    const filterByCategory = (items: Content[]) => {
+      if (currentCategory === 'movies') return items.filter(i => i.type === 'movie');
+      if (currentCategory === 'tv') return items.filter(i => i.type === 'tv');
+      return items;
     };
-  }, [currentCategory, searchQuery, searchResults, continueWatching]);
 
-  // Filter all row sections by category
+    return {
+      continue: filterByCategory(continueWatching),
+      trending: filterByCategory(trendingMovies),
+    };
+  }, [currentCategory, continueWatching, trendingMovies]);
   const filteredRowMyList = useMemo(() => {
     if (currentCategory === 'movies') return rowMyList.filter(i => i.type === 'movie');
     if (currentCategory === 'tv') return rowMyList.filter(i => i.type === 'tv');
@@ -446,6 +465,44 @@ function App() {
     return recentlyAdded;
   }, [currentCategory, recentlyAdded]);
 
+  // Map existing pools to the Wikiflix category structure from the reference UI
+  const curatedDocRows = useMemo(() => {
+    const pool = filteredContent.trending.length > 0 ? filteredContent.trending : filteredRowHiddenGems;
+    const safePool = pool.filter(c => Boolean(c.poster));
+    const takeSlice = (start: number, count = 6) => safePool.slice(start, start + count);
+    const rankedPool = filteredTop10Content.length > 0 ? filteredTop10Content : filteredRowCriticallyAcclaimed;
+
+    return {
+      recentlyEdited: filteredRecentlyAdded,
+      highlyRanked: rankedPool.length > 0 ? rankedPool : safePool,
+      mostViewed: filteredRowTrendingToday.length > 0 ? filteredRowTrendingToday : safePool,
+      femaleDirectors: filteredRowHiddenGems,
+      spanish: takeSlice(0),
+      uk: takeSlice(6),
+      australia: takeSlice(12),
+      canada: takeSlice(18),
+      brazil: takeSlice(24),
+      germany: takeSlice(30),
+      animatedCartoon: filteredRowFamily,
+      thrillerHorror: filteredRowDarkMoody,
+      scienceFiction: filteredRowAction,
+      lgbt: filteredRowHiddenGems.slice(0, 12),
+      children: filteredRowFamily,
+      romanticComedy: filteredRowComedy,
+    };
+  }, [
+    filteredContent.trending,
+    filteredRowHiddenGems,
+    filteredRowTrendingToday,
+    filteredRowFamily,
+    filteredRowDarkMoody,
+    filteredRowAction,
+    filteredRowComedy,
+    filteredRecentlyAdded,
+    filteredTop10Content,
+    filteredRowCriticallyAcclaimed,
+  ]);
+
   const handlePlayContent = (content: Content) => {
     setSelectedContent(content);
     addToContinueWatching(content);
@@ -497,42 +554,34 @@ function App() {
 
   // Use dynamic hero content from TMDB or fallback to featured content
   const displayedHeroContent = useMemo(() => {
-    if (heroContent && heroContent.backdrop) {
-      // Get multiple items for carousel (up to 5)
-      const heroItems: Content[] = [heroContent];
-      
-      // Try to get additional items from trending content
-      if (currentCategory === 'all' && trendingMovies.length > 0) {
-        const additional = trendingMovies
-          .filter(m => m.id !== heroContent.id && m.backdrop && m.backdrop.trim())
-          .slice(0, 4);
-        heroItems.push(...additional);
-      } else if (currentCategory === 'movies' && rowAction.length > 0) {
-        const additional = rowAction
-          .filter(m => m.id !== heroContent.id && m.backdrop && m.backdrop.trim())
-          .slice(0, 4);
-        heroItems.push(...additional);
-      } else if (currentCategory === 'tv' && rowComedy.length > 0) {
-        const additional = rowComedy
-          .filter(m => m.id !== heroContent.id && m.backdrop && m.backdrop.trim())
-          .slice(0, 4);
-        heroItems.push(...additional);
-      }
-      
-      return heroItems.filter(item => item.backdrop && item.backdrop.trim());
-    }
-    
-    // Fallback to trending movies
+    const baseHero = heroContent && heroContent.backdrop ? heroContent : FALLBACK_CONTENT;
+    const heroItems: Content[] = [baseHero];
+
+    // Add up to 4 extras with backdrops from the most relevant row
+    let extraPool: Content[] = [];
+    if (currentCategory === 'all') extraPool = trendingMovies;
+    else if (currentCategory === 'movies') extraPool = rowAction;
+    else if (currentCategory === 'tv') extraPool = rowComedy;
+
+    heroItems.push(
+      ...extraPool
+        .filter(m => m.id !== baseHero.id && m.backdrop && m.backdrop.trim())
+        .slice(0, 4)
+    );
+
+    // If searching, prioritize search results as hero
     if (searchQuery.trim() && searchResults.length > 0) {
-      return searchResults.slice(0, 5).filter(c => c.backdrop && c.backdrop.trim());
+      return searchResults
+        .filter(c => c.backdrop && c.backdrop.trim())
+        .slice(0, 5);
     }
-    
-    return trendingMovies.slice(1, 6).filter(c => c.backdrop && c.backdrop.trim());
+
+    const filtered = heroItems.filter(c => c.backdrop && c.backdrop.trim());
+    return filtered.length > 0 ? filtered : [FALLBACK_CONTENT];
   }, [heroContent, currentCategory, trendingMovies, rowAction, rowComedy, searchQuery, searchResults]);
 
   return (
     <div className="app">
-      <ApiKeyWarning />
       <Navbar
         currentCategory={currentCategory}
         onCategoryChange={setCurrentCategory}
@@ -606,31 +655,33 @@ function App() {
           </>
         )}
 
-        {/* ===== RECENTLY ADDED - New Releases ===== */}
-        {/* Recently Added section - only show when not searching and on 'all' category */}
+        {/* ===== RECENTLY EDITED / HIGHLY RANKED / MOST VIEWED ===== */}
         {!searchQuery.trim() && currentCategory === 'all' && (
           <>
             {isLoadingRecentlyAdded ? (
               <SectionSkeleton />
-            ) : filteredRecentlyAdded.length > 0 && (
+            ) : curatedDocRows.recentlyEdited.length > 0 && (
               <ContentGrid
-                title="Recently Added"
-                items={filteredRecentlyAdded}
+                title="Recently Edited"
+                items={curatedDocRows.recentlyEdited}
                 onCardClick={handlePlayContent}
               />
             )}
-          </>
-        )}
 
-        {/* ===== TOP 10 - Featured First ===== */}
-        {/* Top 10 section - only show when not searching and on 'all' category */}
-        {!searchQuery.trim() && currentCategory === 'all' && (
-          <>
             {isLoadingTop10 ? (
               <SectionSkeleton />
-            ) : filteredTop10Content.length > 0 && (
-              <Top10Grid
-                items={filteredTop10Content}
+            ) : curatedDocRows.highlyRanked.length > 0 && (
+              <ContentGrid
+                title="Highly Ranked"
+                items={curatedDocRows.highlyRanked}
+                onCardClick={handlePlayContent}
+              />
+            )}
+
+            {curatedDocRows.mostViewed.length > 0 && (
+              <ContentGrid
+                title="Most Viewed Movies"
+                items={curatedDocRows.mostViewed}
                 onCardClick={handlePlayContent}
               />
             )}
@@ -704,95 +755,109 @@ function App() {
           </div>
         )}
 
-        {/* ===== POPULAR & TRENDING ===== */}
-
-        {/* Trending Right Now */}
-        {!isSearching && filteredRowTrendingToday.length > 0 && (
-          <ContentGrid
-            title="Trending Right Now"
-            items={filteredRowTrendingToday}
-            onCardClick={handlePlayContent}
-          />
-        )}
-
-        {filteredContent.trending.length > 0 && !searchQuery.trim() && (
-          <ContentGrid
-            title="Trending This Week"
-            items={filteredContent.trending}
-            onCardClick={handlePlayContent}
-          />
-        )}
-
-        {/* Popular TV Shows - only show on TV and All pages */}
-        {filteredContent.tv.length > 0 && currentCategory !== 'movies' && (
-          <ContentGrid
-            title="Popular TV Shows"
-            items={filteredContent.tv}
-            onCardClick={handlePlayContent}
-          />
-        )}
-
-        {/* Popular Movies - only show on Movies and All pages */}
-        {currentCategory !== 'tv' && filteredContent.action.length > 0 && (
-          <ContentGrid
-            title="Popular Movies"
-            items={filteredContent.action}
-            onCardClick={handlePlayContent}
-          />
-        )}
-
-        {/* ===== GENRES ===== */}
-        {/* Action & Adventure */}
-        {!isSearching && filteredRowAction.length > 0 && (
-          <ContentGrid
-            title="Action & Adventure"
-            items={filteredRowAction}
-            onCardClick={handlePlayContent}
-          />
-        )}
-
-        {/* Comedy */}
-        {!isSearching && filteredRowComedy.length > 0 && (
-          <ContentGrid
-            title="Comedy"
-            items={filteredRowComedy}
-            onCardClick={handlePlayContent}
-          />
-        )}
-
-        {/* Dark & Moody */}
-        {!isSearching && filteredRowDarkMoody.length > 0 && (
-          <ContentGrid
-            title="Thriller & Horror"
-            items={filteredRowDarkMoody}
-            onCardClick={handlePlayContent}
-          />
-        )}
-
-        {/* Family */}
-        {!isSearching && filteredRowFamily.length > 0 && (
-          <ContentGrid
-            title="Family & Animation"
-            items={filteredRowFamily}
-            onCardClick={handlePlayContent}
-          />
-        )}
-
-        {/* ===== DISCOVER ===== */}
-        {/* Critically Acclaimed */}
-        {!isSearching && filteredRowCriticallyAcclaimed.length > 0 && (
-          <ContentGrid
-            title="Critically Acclaimed"
-            items={filteredRowCriticallyAcclaimed}
-            onCardClick={handlePlayContent}
-          />
-        )}
-
-        {/* Hidden Gems - Square Grid */}
-        {!isSearching && filteredRowHiddenGems.length > 0 && (
+        {/* ===== FEMALE DIRECTORS ===== */}
+        {!isSearching && curatedDocRows.femaleDirectors.length > 0 && (
           <ContentSquareGrid
-            title="Hidden Gems"
-            items={filteredRowHiddenGems}
+            title="Female Directors"
+            items={curatedDocRows.femaleDirectors}
+            onCardClick={handlePlayContent}
+          />
+        )}
+
+        {/* ===== GENRE / THEMATIC ROWS (from reference UI) ===== */}
+        {!isSearching && curatedDocRows.animatedCartoon.length > 0 && (
+          <ContentGrid
+            title="Animated Cartoon"
+            items={curatedDocRows.animatedCartoon}
+            onCardClick={handlePlayContent}
+          />
+        )}
+
+        {!isSearching && curatedDocRows.thrillerHorror.length > 0 && (
+          <ContentGrid
+            title="Thriller / Horror"
+            items={curatedDocRows.thrillerHorror}
+            onCardClick={handlePlayContent}
+          />
+        )}
+
+        {!isSearching && curatedDocRows.scienceFiction.length > 0 && (
+          <ContentGrid
+            title="Science Fiction"
+            items={curatedDocRows.scienceFiction}
+            onCardClick={handlePlayContent}
+          />
+        )}
+
+        {!isSearching && curatedDocRows.lgbt.length > 0 && (
+          <ContentGrid
+            title="LGBT-Related Film"
+            items={curatedDocRows.lgbt}
+            onCardClick={handlePlayContent}
+          />
+        )}
+
+        {!isSearching && curatedDocRows.children.length > 0 && (
+          <ContentGrid
+            title="Children's Film"
+            items={curatedDocRows.children}
+            onCardClick={handlePlayContent}
+          />
+        )}
+
+        {!isSearching && curatedDocRows.romanticComedy.length > 0 && (
+          <ContentGrid
+            title="Romantic Comedy"
+            items={curatedDocRows.romanticComedy}
+            onCardClick={handlePlayContent}
+          />
+        )}
+
+        {/* ===== GEOGRAPHIC ROWS ===== */}
+        {!isSearching && curatedDocRows.spanish.length > 0 && (
+          <ContentGrid
+            title="Spanish"
+            items={curatedDocRows.spanish}
+            onCardClick={handlePlayContent}
+          />
+        )}
+
+        {!isSearching && curatedDocRows.uk.length > 0 && (
+          <ContentGrid
+            title="United Kingdom"
+            items={curatedDocRows.uk}
+            onCardClick={handlePlayContent}
+          />
+        )}
+
+        {!isSearching && curatedDocRows.australia.length > 0 && (
+          <ContentGrid
+            title="Australia"
+            items={curatedDocRows.australia}
+            onCardClick={handlePlayContent}
+          />
+        )}
+
+        {!isSearching && curatedDocRows.canada.length > 0 && (
+          <ContentGrid
+            title="Canada"
+            items={curatedDocRows.canada}
+            onCardClick={handlePlayContent}
+          />
+        )}
+
+        {!isSearching && curatedDocRows.brazil.length > 0 && (
+          <ContentGrid
+            title="Brazil"
+            items={curatedDocRows.brazil}
+            onCardClick={handlePlayContent}
+          />
+        )}
+
+        {!isSearching && curatedDocRows.germany.length > 0 && (
+          <ContentGrid
+            title="Germany"
+            items={curatedDocRows.germany}
             onCardClick={handlePlayContent}
           />
         )}

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Content } from '@/types';
-import { getFeelGood, getThrilling, getThoughtful } from '@/utils/tmdb';
+import { getForYouContent, getHiddenGems, getCriticallyAcclaimed } from '@/utils/wikidataAdapter';
 import './MoodSelector.css';
 
 interface MoodSelectorProps {
@@ -11,9 +11,9 @@ export const MoodSelector = ({ onSelect }: MoodSelectorProps) => {
   const [loading, setLoading] = useState<string | null>(null);
 
   const moods = [
-    { id: 'feel-good', label: 'Feel-Good', color: '#FFD700', fetch: getFeelGood },
-    { id: 'thrilling', label: 'Thrilling', color: '#E50914', fetch: getThrilling },
-    { id: 'thoughtful', label: 'Thoughtful', color: '#0B84FF', fetch: getThoughtful },
+    { id: 'feel-good', label: 'Feel-Good', color: '#FFD700', fetch: getForYouContent },
+    { id: 'thrilling', label: 'Thrilling', color: '#E50914', fetch: getHiddenGems },
+    { id: 'thoughtful', label: 'Thoughtful', color: '#0B84FF', fetch: getCriticallyAcclaimed },
   ];
 
   const handleMoodClick = async (mood: typeof moods[0]) => {
