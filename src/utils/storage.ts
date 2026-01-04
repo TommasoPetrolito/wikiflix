@@ -5,13 +5,13 @@ export const saveProgress = (progress: WatchProgress): void => {
   localStorage.setItem(key, JSON.stringify(progress));
 };
 
-export const getProgress = (id: number, mediaType: 'movie' | 'tv'): WatchProgress | null => {
+export const getProgress = (id: string | number, mediaType: 'movie' | 'tv'): WatchProgress | null => {
   const key = `progress_${mediaType}_${id}`;
   const data = localStorage.getItem(key);
   return data ? JSON.parse(data) : null;
 };
 
-export const updateEpisodeInfo = (id: number, season: number, episode: number): void => {
+export const updateEpisodeInfo = (id: string | number, season: number, episode: number): void => {
   const key = `progress_tv_${id}`;
   const existing = localStorage.getItem(key);
   
@@ -90,17 +90,17 @@ export interface IntroMarkers {
   end: number;   // seconds
 }
 
-export const getIntroMarkers = (tvId: number): IntroMarkers | null => {
+export const getIntroMarkers = (tvId: string | number): IntroMarkers | null => {
   const data = localStorage.getItem(`intro_markers_${tvId}`);
   return data ? JSON.parse(data) : null;
 };
 
-export const saveIntroMarkers = (tvId: number, markers: IntroMarkers): void => {
+export const saveIntroMarkers = (tvId: string | number, markers: IntroMarkers): void => {
   if (markers.end <= markers.start) return; // basic guard
   localStorage.setItem(`intro_markers_${tvId}`, JSON.stringify(markers));
 };
 
-export const clearIntroMarkers = (tvId: number): void => {
+export const clearIntroMarkers = (tvId: string | number): void => {
   localStorage.removeItem(`intro_markers_${tvId}`);
 };
 

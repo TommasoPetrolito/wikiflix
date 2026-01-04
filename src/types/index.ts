@@ -1,8 +1,8 @@
 export interface Content {
-  id: number;
+  id: string | number; // Wikidata Q-id (string) or legacy numeric TMDB id
   title: string;
   type: 'movie' | 'tv';
-  year: number;
+  year?: number;
   poster: string;
   backdrop: string;
   description: string;
@@ -11,7 +11,7 @@ export interface Content {
 }
 
 export interface WatchProgress {
-  id: number;
+  id: string | number;
   mediaType: 'movie' | 'tv';
   currentTime: number;
   duration: number;
