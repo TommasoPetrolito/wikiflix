@@ -48,6 +48,44 @@ const FORYOU_QUERIES = [
   'adventure film',
 ];
 
+// Thematic buckets for tighter curation
+const FEMALE_DIRECTOR_QUERIES = [
+  'film directed by woman',
+  'female director film trailer',
+  'women filmmaker film',
+  'film by female director',
+];
+
+const LGBT_QUERIES = [
+  'lgbt film trailer',
+  'queer film trailer',
+  'gay film trailer',
+  'lesbian film trailer',
+];
+
+const SCI_FI_QUERIES = [
+  'science fiction film trailer',
+  'sci-fi film trailer',
+  'space opera film trailer',
+];
+
+const ROMCOM_QUERIES = [
+  'romantic comedy film trailer',
+  'romcom film trailer',
+  'romance comedy film trailer',
+];
+
+type RegionKey = 'spanish' | 'uk' | 'australia' | 'canada' | 'brazil' | 'germany';
+
+const REGION_QUERY_MAP: Record<RegionKey, string[]> = {
+  spanish: ['spanish-language film trailer', 'mexican film trailer', 'argentine film trailer'],
+  uk: ['british film trailer', 'english film trailer', 'uk film trailer'],
+  australia: ['australian film trailer', 'australian tv film trailer'],
+  canada: ['canadian film trailer', 'quebec film trailer'],
+  brazil: ['brazilian film trailer', 'portuguese-language film trailer'],
+  germany: ['german film trailer', 'german-language film trailer'],
+};
+
 const SEED_FALLBACK_QUERIES = [
   'Nosferatu',
   'Metropolis',
@@ -67,6 +105,9 @@ const GENRE_QUERY_MAP: Record<number, string[]> = {
   16: ['animated short film', 'animation film trailer'],
   10751: ['family film trailer', 'children film'],
   80: ['crime film trailer', 'film noir trailer'],
+  878: ['science fiction film trailer', 'sci-fi film trailer', 'space opera film trailer'],
+  10749: ['romantic comedy film trailer', 'romantic film trailer'],
+  10765: ['science fiction television film trailer', 'science fiction tv trailer'],
 };
 
 const categoryCache = new Map<string, Content[]>();
@@ -335,6 +376,37 @@ export const getByGenre = async (_mediaType: 'movie' | 'tv', _genreId: number, l
   const queries = GENRE_QUERY_MAP[_genreId] || FORYOU_QUERIES;
   const pool = await fetchCategoryPool(`genre-${_genreId}`, queries, 8, 60);
   const items = shuffle(pool).slice(0, Math.min(limit, 20));
+  return items.length > 0 ? items : MINIMAL_FALLBACKS;
+};
+
+export const getRegionalContent = async (region: RegionKey, limit = 18): Promise<Content[]> => {
+  const queries = REGION_QUERY_MAP[region] || [];
+  const pool = await fetchCategoryPool(`region-${region}`, queries, 6, 50);
+  const items = shuffle(pool).slice(0, Math.min(limit, 18));
+  return items.length > 0 ? items : MINIMAL_FALLBACKS;
+};
+
+export const getFemaleDirectedContent = async (limit = 24): Promise<Content[]> => {
+  const pool = await fetchCategoryPool('female-directors', FEMALE_DIRECTOR_QUERIES, 6, 50);
+  const items = shuffle(pool).slice(0, Math.min(limit, 24));
+  return items.length > 0 ? items : MINIMAL_FALLBACKS;
+};
+
+export const getLGBTContent = async (limit = 18): Promise<Content[]> => {
+  const pool = await fetchCategoryPool('lgbt', LGBT_QUERIES, 6, 50);
+  const items = shuffle(pool).slice(0, Math.min(limit, 18));
+  return items.length > 0 ? items : MINIMAL_FALLBACKS;
+};
+
+export const getScienceFictionContent = async (limit = 18): Promise<Content[]> => {
+  const pool = await fetchCategoryPool('sci-fi', SCI_FI_QUERIES, 6, 50);
+  const items = shuffle(pool).slice(0, Math.min(limit, 18));
+  return items.length > 0 ? items : MINIMAL_FALLBACKS;
+};
+
+export const getRomanticComedyContent = async (limit = 18): Promise<Content[]> => {
+  const pool = await fetchCategoryPool('romcom', ROMCOM_QUERIES, 6, 50);
+  const items = shuffle(pool).slice(0, Math.min(limit, 18));
   return items.length > 0 ? items : MINIMAL_FALLBACKS;
 };
 

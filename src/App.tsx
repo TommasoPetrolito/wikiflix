@@ -10,7 +10,7 @@ import { Content, Category, Stream } from './types';
 import { addToContinueWatching, getContinueWatching, migrateKnownFixes, getMyList } from './utils/storage';
 import { usePlayerTracking } from './hooks/usePlayerTracking';
 import { useTVNavigation } from './hooks/useTVNavigation';
-import { searchTMDB, getTrendingMovies, getTopRatedMovies, getTopRatedTV, getTop10, getByGenre, getTrendingTV, getRecommendations, getUpcomingMovies, getCriticallyAcclaimed, getHiddenGems, getTrendingToday, getMoviesByActor, findCollectionByMovie, getRecentlyAdded, getForYouContent, getLiveStreams } from './utils/wikidataAdapter';
+import { searchTMDB, getTrendingMovies, getTopRatedMovies, getTopRatedTV, getTop10, getByGenre, getTrendingTV, getRecommendations, getUpcomingMovies, getCriticallyAcclaimed, getHiddenGems, getTrendingToday, getMoviesByActor, findCollectionByMovie, getRecentlyAdded, getForYouContent, getLiveStreams, getRegionalContent, getFemaleDirectedContent, getLGBTContent, getScienceFictionContent, getRomanticComedyContent } from './utils/wikidataAdapter';
 import { MoodSelector } from './components/MoodSelector';
 import './App.css';
 
@@ -42,12 +42,22 @@ function App() {
   const [rowComedy, setRowComedy] = useState<Content[]>([]);
   const [rowDarkMoody, setRowDarkMoody] = useState<Content[]>([]);
   const [rowFamily, setRowFamily] = useState<Content[]>([]);
+  const [rowScienceFiction, setRowScienceFiction] = useState<Content[]>([]);
+  const [rowRomanticComedy, setRowRomanticComedy] = useState<Content[]>([]);
   const [rowBecause, setRowBecause] = useState<{title:string; items: Content[]}>({title:'', items: []});
   const [rowMyList, setRowMyList] = useState<Content[]>(getMyList());
   const [rowComingSoon, setRowComingSoon] = useState<Content[]>([]);
   const [rowCriticallyAcclaimed, setRowCriticallyAcclaimed] = useState<Content[]>([]);
   const [rowHiddenGems, setRowHiddenGems] = useState<Content[]>([]);
   const [rowTrendingToday, setRowTrendingToday] = useState<Content[]>([]);
+  const [rowFemaleDirectors, setRowFemaleDirectors] = useState<Content[]>([]);
+  const [rowLGBT, setRowLGBT] = useState<Content[]>([]);
+  const [rowSpanish, setRowSpanish] = useState<Content[]>([]);
+  const [rowUK, setRowUK] = useState<Content[]>([]);
+  const [rowAustralia, setRowAustralia] = useState<Content[]>([]);
+  const [rowCanada, setRowCanada] = useState<Content[]>([]);
+  const [rowBrazil, setRowBrazil] = useState<Content[]>([]);
+  const [rowGermany, setRowGermany] = useState<Content[]>([]);
   const [rowMoodContent, setRowMoodContent] = useState<{title: string; items: Content[]} | null>(null);
   const [actorCollections, setActorCollections] = useState<Array<{actor: string; content: Content[]; profilePath: string | null}>>([]);
   const [franchiseCollections, setFranchiseCollections] = useState<Array<{name: string; content: Content[]}>>([]);
@@ -192,6 +202,14 @@ function App() {
         ]);
         setRowFamily([...familyMovies.slice(0, 20), ...animationMovies.slice(0, 20), ...familyTV.slice(0, 20)]);
 
+        // Science Fiction (dedicated bucket)
+        const sciFi = await getScienceFictionContent(36);
+        setRowScienceFiction(sciFi);
+
+        // Romantic Comedy (dedicated bucket)
+        const romcom = await getRomanticComedyContent(30);
+        setRowRomanticComedy(romcom);
+
         // Coming Soon (upcoming movies)
         const upcoming = await getUpcomingMovies();
         setRowComingSoon(upcoming.slice(0, 40));
@@ -204,9 +222,33 @@ function App() {
         const hiddenGems = await getHiddenGems();
         setRowHiddenGems(hiddenGems);
 
+        // Female directors + LGBT themes
+        const [femaleDirected, lgbtContent] = await Promise.all([
+          getFemaleDirectedContent(),
+          getLGBTContent(),
+        ]);
+        setRowFemaleDirectors(femaleDirected);
+        setRowLGBT(lgbtContent);
+
         // Trending Today (real-time trending)
         const trendingToday = await getTrendingToday();
         setRowTrendingToday(trendingToday);
+
+        // Regional pools
+        const [spanish, uk, australia, canada, brazil, germany] = await Promise.all([
+          getRegionalContent('spanish'),
+          getRegionalContent('uk'),
+          getRegionalContent('australia'),
+          getRegionalContent('canada'),
+          getRegionalContent('brazil'),
+          getRegionalContent('germany'),
+        ]);
+        setRowSpanish(spanish);
+        setRowUK(uk);
+        setRowAustralia(australia);
+        setRowCanada(canada);
+        setRowBrazil(brazil);
+        setRowGermany(germany);
 
         // Recently Added (new releases from last 30 days)
         setIsLoadingRecentlyAdded(true);
@@ -412,6 +454,18 @@ function App() {
     return rowFamily;
   }, [currentCategory, rowFamily]);
 
+  const filteredRowScienceFiction = useMemo(() => {
+    if (currentCategory === 'movies') return rowScienceFiction.filter(i => i.type === 'movie');
+    if (currentCategory === 'tv') return rowScienceFiction.filter(i => i.type === 'tv');
+    return rowScienceFiction;
+  }, [currentCategory, rowScienceFiction]);
+
+  const filteredRowRomanticComedy = useMemo(() => {
+    if (currentCategory === 'movies') return rowRomanticComedy.filter(i => i.type === 'movie');
+    if (currentCategory === 'tv') return rowRomanticComedy.filter(i => i.type === 'tv');
+    return rowRomanticComedy;
+  }, [currentCategory, rowRomanticComedy]);
+
   const filteredRowTrendingToday = useMemo(() => {
     if (currentCategory === 'movies') return rowTrendingToday.filter(i => i.type === 'movie');
     if (currentCategory === 'tv') return rowTrendingToday.filter(i => i.type === 'tv');
@@ -453,6 +507,54 @@ function App() {
     return rowHiddenGems;
   }, [currentCategory, rowHiddenGems]);
 
+  const filteredRowFemaleDirectors = useMemo(() => {
+    if (currentCategory === 'movies') return rowFemaleDirectors.filter(i => i.type === 'movie');
+    if (currentCategory === 'tv') return rowFemaleDirectors.filter(i => i.type === 'tv');
+    return rowFemaleDirectors;
+  }, [currentCategory, rowFemaleDirectors]);
+
+  const filteredRowLGBT = useMemo(() => {
+    if (currentCategory === 'movies') return rowLGBT.filter(i => i.type === 'movie');
+    if (currentCategory === 'tv') return rowLGBT.filter(i => i.type === 'tv');
+    return rowLGBT;
+  }, [currentCategory, rowLGBT]);
+
+  const filteredRowSpanish = useMemo(() => {
+    if (currentCategory === 'movies') return rowSpanish.filter(i => i.type === 'movie');
+    if (currentCategory === 'tv') return rowSpanish.filter(i => i.type === 'tv');
+    return rowSpanish;
+  }, [currentCategory, rowSpanish]);
+
+  const filteredRowUK = useMemo(() => {
+    if (currentCategory === 'movies') return rowUK.filter(i => i.type === 'movie');
+    if (currentCategory === 'tv') return rowUK.filter(i => i.type === 'tv');
+    return rowUK;
+  }, [currentCategory, rowUK]);
+
+  const filteredRowAustralia = useMemo(() => {
+    if (currentCategory === 'movies') return rowAustralia.filter(i => i.type === 'movie');
+    if (currentCategory === 'tv') return rowAustralia.filter(i => i.type === 'tv');
+    return rowAustralia;
+  }, [currentCategory, rowAustralia]);
+
+  const filteredRowCanada = useMemo(() => {
+    if (currentCategory === 'movies') return rowCanada.filter(i => i.type === 'movie');
+    if (currentCategory === 'tv') return rowCanada.filter(i => i.type === 'tv');
+    return rowCanada;
+  }, [currentCategory, rowCanada]);
+
+  const filteredRowBrazil = useMemo(() => {
+    if (currentCategory === 'movies') return rowBrazil.filter(i => i.type === 'movie');
+    if (currentCategory === 'tv') return rowBrazil.filter(i => i.type === 'tv');
+    return rowBrazil;
+  }, [currentCategory, rowBrazil]);
+
+  const filteredRowGermany = useMemo(() => {
+    if (currentCategory === 'movies') return rowGermany.filter(i => i.type === 'movie');
+    if (currentCategory === 'tv') return rowGermany.filter(i => i.type === 'tv');
+    return rowGermany;
+  }, [currentCategory, rowGermany]);
+
   const filteredTop10Content = useMemo(() => {
     if (currentCategory === 'movies') return top10Content.filter(i => i.type === 'movie');
     if (currentCategory === 'tv') return top10Content.filter(i => i.type === 'tv');
@@ -476,19 +578,19 @@ function App() {
       recentlyEdited: filteredRecentlyAdded,
       highlyRanked: rankedPool.length > 0 ? rankedPool : safePool,
       mostViewed: filteredRowTrendingToday.length > 0 ? filteredRowTrendingToday : safePool,
-      femaleDirectors: filteredRowHiddenGems,
-      spanish: takeSlice(0),
-      uk: takeSlice(6),
-      australia: takeSlice(12),
-      canada: takeSlice(18),
-      brazil: takeSlice(24),
-      germany: takeSlice(30),
+      femaleDirectors: filteredRowFemaleDirectors.length > 0 ? filteredRowFemaleDirectors : safePool,
+      spanish: filteredRowSpanish.length > 0 ? filteredRowSpanish : takeSlice(0),
+      uk: filteredRowUK.length > 0 ? filteredRowUK : takeSlice(6),
+      australia: filteredRowAustralia.length > 0 ? filteredRowAustralia : takeSlice(12),
+      canada: filteredRowCanada.length > 0 ? filteredRowCanada : takeSlice(18),
+      brazil: filteredRowBrazil.length > 0 ? filteredRowBrazil : takeSlice(24),
+      germany: filteredRowGermany.length > 0 ? filteredRowGermany : takeSlice(30),
       animatedCartoon: filteredRowFamily,
       thrillerHorror: filteredRowDarkMoody,
-      scienceFiction: filteredRowAction,
-      lgbt: filteredRowHiddenGems.slice(0, 12),
+      scienceFiction: filteredRowScienceFiction.length > 0 ? filteredRowScienceFiction : filteredRowAction,
+      lgbt: filteredRowLGBT.length > 0 ? filteredRowLGBT : filteredRowHiddenGems.slice(0, 12),
       children: filteredRowFamily,
-      romanticComedy: filteredRowComedy,
+      romanticComedy: filteredRowRomanticComedy.length > 0 ? filteredRowRomanticComedy : filteredRowComedy,
     };
   }, [
     filteredContent.trending,
@@ -498,6 +600,16 @@ function App() {
     filteredRowDarkMoody,
     filteredRowAction,
     filteredRowComedy,
+    filteredRowScienceFiction,
+    filteredRowRomanticComedy,
+    filteredRowFemaleDirectors,
+    filteredRowLGBT,
+    filteredRowSpanish,
+    filteredRowUK,
+    filteredRowAustralia,
+    filteredRowCanada,
+    filteredRowBrazil,
+    filteredRowGermany,
     filteredRecentlyAdded,
     filteredTop10Content,
     filteredRowCriticallyAcclaimed,
