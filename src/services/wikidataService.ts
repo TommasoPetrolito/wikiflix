@@ -12,7 +12,37 @@ export interface WikidataMedia {
   subtitles?: string;
   year?: number;
   sitelinks?: number;
+  genres?: string[];
+  cast?: string[];
 }
+
+const mergeMedia = (items: WikidataMedia[]): WikidataMedia[] => {
+  const map = new Map<string, WikidataMedia>();
+  for (const item of items) {
+    const existing = map.get(item.id);
+    if (!existing) {
+      map.set(item.id, {
+        ...item,
+        genres: item.genres ? [...item.genres] : undefined,
+        cast: item.cast ? [...item.cast] : undefined,
+      });
+      continue;
+    }
+    map.set(item.id, {
+      ...existing,
+      title: existing.title || item.title,
+      description: existing.description || item.description,
+      videoUrl: existing.videoUrl || item.videoUrl,
+      poster: existing.poster || item.poster,
+      subtitles: existing.subtitles || item.subtitles,
+      year: existing.year ?? item.year,
+      sitelinks: existing.sitelinks ?? item.sitelinks,
+      genres: [...new Set([...(existing.genres || []), ...(item.genres || [])])],
+      cast: [...new Set([...(existing.cast || []), ...(item.cast || [])])],
+    });
+  }
+  return Array.from(map.values());
+};
 
 const fetchSparql = async <T>(query: string, cacheKey: string, ttlMs = DEFAULT_TTL): Promise<T[]> => {
   const cached = getCached<T[]>(cacheKey);
@@ -33,8 +63,9 @@ const fetchSparql = async <T>(query: string, cacheKey: string, ttlMs = DEFAULT_T
   const json = await res.json();
   const bindings = json?.results?.bindings ?? [];
   const mapped = bindings.map((b: any) => mapBindingToMedia(b));
-  setCached(cacheKey, mapped as T[], ttlMs);
-  return mapped as T[];
+  const merged = mergeMedia(mapped);
+  setCached(cacheKey, merged as T[], ttlMs);
+  return merged as T[];
 };
 
 const mapBindingToMedia = (b: any): WikidataMedia => {
@@ -46,16 +77,32 @@ const mapBindingToMedia = (b: any): WikidataMedia => {
   const subtitles = b.subtitles?.value;
   const year = b.publicationDate?.value ? Number(b.publicationDate.value.slice(0, 4)) : undefined;
   const sitelinks = b.sitelinks?.value ? Number(b.sitelinks.value) : undefined;
-  return { id, title, description, videoUrl, poster, subtitles, year, sitelinks };
+  const genre = b.genreLabel?.value;
+  const cast = b.castLabel?.value;
+  return {
+    id,
+    title,
+    description,
+    videoUrl,
+    poster,
+    subtitles,
+    year,
+    sitelinks,
+    genres: genre ? [genre] : undefined,
+    cast: cast ? [cast] : undefined,
+  };
 };
 
 export const fetchPublicDomainFilms = async (limit = 100) => {
-  const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles ?publicationDate WHERE {
+  const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles ?publicationDate ?sitelinks ?genreLabel ?castLabel WHERE {
     ?item wdt:P31 wd:Q11424;
           wdt:P10 ?video.
     OPTIONAL { ?item wdt:P18 ?image. }
     OPTIONAL { ?item wdt:P1173 ?subtitles. }
     OPTIONAL { ?item wdt:P577 ?publicationDate. }
+    OPTIONAL { ?item wikibase:sitelinks ?sitelinks. }
+    OPTIONAL { ?item wdt:P136 ?genre. ?genre rdfs:label ?genreLabel. FILTER(LANG(?genreLabel) IN ("en","it")) }
+    OPTIONAL { ?item wdt:P161 ?cast. ?cast rdfs:label ?castLabel. FILTER(LANG(?castLabel) IN ("en","it")) }
     SERVICE wikibase:label { bd:serviceParam wikibase:language "it,en". }
     OPTIONAL {
       ?item schema:description ?description.
@@ -68,12 +115,16 @@ export const fetchPublicDomainFilms = async (limit = 100) => {
 export const searchByTitle = async (queryText: string, limit = 50) => {
   const safeQuery = queryText.trim();
   if (!safeQuery) return [] as WikidataMedia[];
-  const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles WHERE {
+  const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles ?publicationDate ?sitelinks ?genreLabel ?castLabel WHERE {
     ?item wdt:P31 wd:Q11424;
           wdt:P10 ?video.
     SERVICE wikibase:label { bd:serviceParam wikibase:language "it,en". }
     OPTIONAL { ?item wdt:P18 ?image. }
     OPTIONAL { ?item wdt:P1173 ?subtitles. }
+    OPTIONAL { ?item wdt:P577 ?publicationDate. }
+    OPTIONAL { ?item wikibase:sitelinks ?sitelinks. }
+    OPTIONAL { ?item wdt:P136 ?genre. ?genre rdfs:label ?genreLabel. FILTER(LANG(?genreLabel) IN ("en","it")) }
+    OPTIONAL { ?item wdt:P161 ?cast. ?cast rdfs:label ?castLabel. FILTER(LANG(?castLabel) IN ("en","it")) }
     OPTIONAL { ?item schema:description ?description. FILTER(LANG(?description) = "it") }
     FILTER(CONTAINS(LCASE(?itemLabel), LCASE("${safeQuery}")))
   } LIMIT ${limit}`;
@@ -81,11 +132,15 @@ export const searchByTitle = async (queryText: string, limit = 50) => {
 };
 
 export const fetchRandomSet = async (limit = 40) => {
-  const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles WHERE {
+  const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles ?publicationDate ?sitelinks ?genreLabel ?castLabel WHERE {
     ?item wdt:P31 wd:Q11424;
           wdt:P10 ?video.
     OPTIONAL { ?item wdt:P18 ?image. }
     OPTIONAL { ?item wdt:P1173 ?subtitles. }
+    OPTIONAL { ?item wdt:P577 ?publicationDate. }
+    OPTIONAL { ?item wikibase:sitelinks ?sitelinks. }
+    OPTIONAL { ?item wdt:P136 ?genre. ?genre rdfs:label ?genreLabel. FILTER(LANG(?genreLabel) IN ("en","it")) }
+    OPTIONAL { ?item wdt:P161 ?cast. ?cast rdfs:label ?castLabel. FILTER(LANG(?castLabel) IN ("en","it")) }
     OPTIONAL { ?item schema:description ?description. FILTER(LANG(?description) = "it") }
   }
   ORDER BY RAND()
@@ -95,13 +150,15 @@ export const fetchRandomSet = async (limit = 40) => {
 
 // Popular proxy: order by sitelinks (as a rough measure of prominence)
 export const fetchPopular = async (limit = 40) => {
-  const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles ?publicationDate ?sitelinks WHERE {
+  const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles ?publicationDate ?sitelinks ?genreLabel ?castLabel WHERE {
     ?item wdt:P31 wd:Q11424;
           wdt:P10 ?video;
           wikibase:sitelinks ?sitelinks.
     OPTIONAL { ?item wdt:P18 ?image. }
     OPTIONAL { ?item wdt:P1173 ?subtitles. }
     OPTIONAL { ?item wdt:P577 ?publicationDate. }
+    OPTIONAL { ?item wdt:P136 ?genre. ?genre rdfs:label ?genreLabel. FILTER(LANG(?genreLabel) IN ("en","it")) }
+    OPTIONAL { ?item wdt:P161 ?cast. ?cast rdfs:label ?castLabel. FILTER(LANG(?castLabel) IN ("en","it")) }
     SERVICE wikibase:label { bd:serviceParam wikibase:language "it,en". }
     OPTIONAL { ?item schema:description ?description. FILTER(LANG(?description) = "it") }
   }
@@ -112,12 +169,15 @@ export const fetchPopular = async (limit = 40) => {
 
 // Recently added proxy: order by publication date desc
 export const fetchRecentlyAdded = async (limit = 40) => {
-  const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles ?publicationDate WHERE {
+  const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles ?publicationDate ?sitelinks ?genreLabel ?castLabel WHERE {
     ?item wdt:P31 wd:Q11424;
           wdt:P10 ?video;
           wdt:P577 ?publicationDate.
     OPTIONAL { ?item wdt:P18 ?image. }
     OPTIONAL { ?item wdt:P1173 ?subtitles. }
+    OPTIONAL { ?item wikibase:sitelinks ?sitelinks. }
+    OPTIONAL { ?item wdt:P136 ?genre. ?genre rdfs:label ?genreLabel. FILTER(LANG(?genreLabel) IN ("en","it")) }
+    OPTIONAL { ?item wdt:P161 ?cast. ?cast rdfs:label ?castLabel. FILTER(LANG(?castLabel) IN ("en","it")) }
     SERVICE wikibase:label { bd:serviceParam wikibase:language "it,en". }
     OPTIONAL { ?item schema:description ?description. FILTER(LANG(?description) = "it") }
   }
@@ -130,7 +190,7 @@ export const fetchRecentlyAdded = async (limit = 40) => {
 export const fetchByGenre = async (genreQid: string, limit = 60) => {
   const safeGenre = genreQid.trim();
   if (!safeGenre) return [] as WikidataMedia[];
-  const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles ?publicationDate ?sitelinks WHERE {
+  const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles ?publicationDate ?sitelinks ?genreLabel ?castLabel WHERE {
     VALUES ?genre { wd:${safeGenre} }
     ?item wdt:P31 wd:Q11424;
           wdt:P10 ?video;
@@ -139,6 +199,8 @@ export const fetchByGenre = async (genreQid: string, limit = 60) => {
     OPTIONAL { ?item wdt:P1173 ?subtitles. }
     OPTIONAL { ?item wdt:P577 ?publicationDate. }
     OPTIONAL { ?item wikibase:sitelinks ?sitelinks. }
+    OPTIONAL { ?item wdt:P136 ?g. ?g rdfs:label ?genreLabel. FILTER(LANG(?genreLabel) IN ("en","it")) }
+    OPTIONAL { ?item wdt:P161 ?cast. ?cast rdfs:label ?castLabel. FILTER(LANG(?castLabel) IN ("en","it")) }
     SERVICE wikibase:label { bd:serviceParam wikibase:language "it,en". }
     OPTIONAL { ?item schema:description ?description. FILTER(LANG(?description) = "it") }
   }
@@ -151,7 +213,7 @@ export const fetchByGenre = async (genreQid: string, limit = 60) => {
 export const fetchRelatedByCastOrGenre = async (anchorQid: string, limit = 60) => {
   const safeAnchor = anchorQid.trim();
   if (!safeAnchor) return [] as WikidataMedia[];
-  const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles ?publicationDate ?sitelinks WHERE {
+  const query = `SELECT ?item ?itemLabel ?description ?video ?image ?subtitles ?publicationDate ?sitelinks ?genreLabel ?castLabel WHERE {
     VALUES ?anchor { wd:${safeAnchor} }
     ?anchor wdt:P136 ?anchorGenre.
     OPTIONAL { ?anchor wdt:P161 ?anchorCast. }
@@ -164,6 +226,8 @@ export const fetchRelatedByCastOrGenre = async (anchorQid: string, limit = 60) =
     OPTIONAL { ?item wikibase:sitelinks ?sitelinks. }
     OPTIONAL { ?item wdt:P136 ?g. }
     OPTIONAL { ?item wdt:P161 ?c. }
+    OPTIONAL { ?g rdfs:label ?genreLabel. FILTER(LANG(?genreLabel) IN ("en","it")) }
+    OPTIONAL { ?c rdfs:label ?castLabel. FILTER(LANG(?castLabel) IN ("en","it")) }
 
     FILTER(?item != ?anchor)
     FILTER(BOUND(?g) || BOUND(?c))
