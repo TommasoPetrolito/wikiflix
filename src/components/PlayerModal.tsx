@@ -1,4 +1,134 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { Content, WatchProgress } from '@/types';
+import { getProgress, saveProgress } from '@/utils/storage';
+import './PlayerModal.css';
+
+interface PlayerModalProps {
+  content: Content | null;
+  onClose: () => void;
+}
+
+export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [progress, setProgress] = useState<WatchProgress | null>(null);
+  const [isReady, setIsReady] = useState(false);
+
+  const closeOnEsc = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    },
+    [onClose]
+  );
+
+  useEffect(() => {
+    window.addEventListener('keydown', closeOnEsc);
+    return () => window.removeEventListener('keydown', closeOnEsc);
+  }, [closeOnEsc]);
+
+  useEffect(() => {
+    if (!content) return;
+    const stored = getProgress(content.id, content.type);
+    if (stored) {
+      setProgress(stored);
+    } else {
+      setProgress(null);
+    }
+  }, [content]);
+
+  useEffect(() => {
+    if (!content || !videoRef.current) return;
+    const video = videoRef.current;
+
+    // Seek to previous position if available
+    if (progress?.currentTime) {
+      video.currentTime = progress.currentTime;
+    }
+
+    const handleTimeUpdate = () => {
+      if (!content) return;
+      const currentTime = video.currentTime;
+      const duration = video.duration || 1;
+      const newProgress: WatchProgress = {
+        id: content.id,
+        mediaType: content.type,
+        currentTime,
+        duration,
+        progress: Math.min(100, Math.max(0, (currentTime / duration) * 100)),
+        lastWatched: Date.now(),
+        season: content.season,
+        episode: content.episode,
+      };
+      setProgress(newProgress);
+      saveProgress(newProgress);
+    };
+
+    const handleLoadedMetadata = () => {
+      setIsReady(true);
+      if (progress?.currentTime) {
+        video.currentTime = progress.currentTime;
+      }
+    };
+
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+
+    return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+    };
+  }, [content, progress]);
+
+  if (!content) return null;
+
+  const hasSubtitles = Boolean(content.subtitles);
+  const videoSource = content.videoUrl;
+
+  return (
+    <div className="player-modal-overlay" onClick={onClose}>
+      <div className="player-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="close-button" onClick={onClose} aria-label="Close player">×</button>
+        <div className="player-header">
+          <div>
+            <h2>{content.title}</h2>
+            {content.description && <p className="player-description">{content.description}</p>}
+          </div>
+          {isReady && progress && (
+            <span className="player-progress">Resumed at {Math.round(progress.progress)}%</span>
+          )}
+        </div>
+
+        {videoSource ? (
+          <video
+            ref={videoRef}
+            className="player-video"
+            controls
+            autoPlay
+            playsInline
+            preload="metadata"
+            poster={content.backdrop || content.poster}
+          >
+            <source src={videoSource} />
+            {hasSubtitles && (
+              <track
+                src={content.subtitles}
+                kind="subtitles"
+                srcLang="it"
+                label="Subtitles"
+                default
+              />
+            )}
+          </video>
+        ) : (
+          <div className="player-fallback">
+            <p>Video non disponibile per questo titolo.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};import { useEffect, useState, useRef, useCallback } from 'react';
 import { Content, WatchProgress } from '@/types';
 import { getProgress, saveProgress, getIntroMarkers, saveIntroMarkers, clearIntroMarkers, toggleMyList, isInMyList } from '@/utils/storage';
 import { getSeasonEpisodes, TMDBEpisode, getCredits, TMDBCast, getRecommendations, getTVShowDetails, TMDBTVDetails } from '@/utils/tmdb';

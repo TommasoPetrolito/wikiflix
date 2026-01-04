@@ -6,6 +6,8 @@ export interface Content {
   poster: string;
   backdrop: string;
   description: string;
+  videoUrl?: string;
+  subtitles?: string;
   season?: number;
   episode?: number;
 }

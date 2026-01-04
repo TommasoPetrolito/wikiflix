@@ -9,7 +9,6 @@ import { SectionSkeleton } from './components/SectionSkeleton';
 import { StreamCard } from './components/StreamCard';
 import { Content, Category, Stream } from './types';
 import { trendingMovies, popularTV, actionMovies } from './data/content';
-import { buildVidkingUrl } from './utils/vidking';
 import { addToContinueWatching, getContinueWatching, migrateKnownFixes, getMyList } from './utils/storage';
 import { usePlayerTracking } from './hooks/usePlayerTracking';
 import { useTVNavigation } from './hooks/useTVNavigation';
@@ -858,7 +857,6 @@ function App() {
 
       <PlayerModal
         content={selectedContent}
-        playerUrl={selectedContent ? buildVidkingUrl(selectedContent) : ''}
         onClose={handleClosePlayer}
       />
     </div>

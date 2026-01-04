@@ -1,6 +1,5 @@
 import { Content, Stream } from '@/types';
 import {
-  fetchPublicDomainFilms,
   searchByTitle,
   fetchRandomSet,
   fetchPopular,
@@ -22,14 +21,19 @@ const GENRE_MAP: Record<number, string> = {
   80: 'Q859369', // Crime film (proxy for moody TV)
 };
 
+const FALLBACK_POSTER = 'https://via.placeholder.com/600x900?text=Wikiflix';
+const FALLBACK_BACKDROP = 'https://via.placeholder.com/1280x720?text=Wikiflix';
+
 const mapMediaToContent = (m: WikidataMedia): Content => ({
   id: m.id,
   title: m.title,
   type: 'movie',
   year: m.year,
-  poster: m.poster || '',
-  backdrop: m.poster || '',
-  description: m.description || '',
+  poster: m.poster || FALLBACK_POSTER,
+  backdrop: m.poster || FALLBACK_BACKDROP,
+  description: m.description || 'Public domain movie from Wikidata',
+  videoUrl: m.videoUrl,
+  subtitles: m.subtitles,
 });
 
 // --- Adapters matching the previous TMDB API surface ---
