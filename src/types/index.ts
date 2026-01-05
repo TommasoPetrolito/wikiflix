@@ -13,7 +13,7 @@ export interface Content {
   wikidataId?: string;
   commonsLink?: string;
   wikipediaUrl?: string;
-  altVideos?: Array<{ kind: 'commons' | 'youtube' | 'archive' | 'libreflix'; url: string; label?: string; lang?: string }>;
+  altVideos?: Array<{ kind: 'commons' | 'youtube' | 'archive' | 'libreflix' | 'vimeo'; url: string; label?: string; lang?: string }>;
   language?: string;
   license?: string;
   durationSeconds?: number;
@@ -21,6 +21,7 @@ export interface Content {
   genres?: string[];
   cast?: string[];
   directors?: string[];
+  countries?: string[];
   season?: number;
   episode?: number;
 }

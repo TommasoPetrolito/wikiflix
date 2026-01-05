@@ -284,7 +284,7 @@ const parseDurationSeconds = (claim: any): number | undefined => {
   return amount;
 };
 
-const mapEntityToContent = (entity: WikidataEntity): Content | null => {
+const mapEntityToContent = (entity: WikidataEntity, labelMap: Record<string, string>): Content | null => {
   const title = entity.labels?.en?.value || entity.labels?.it?.value;
   if (!title) return null;
 
@@ -313,7 +313,10 @@ const mapEntityToContent = (entity: WikidataEntity): Content | null => {
   const year = dateClaim && typeof dateClaim === 'string' ? Number(dateClaim.slice(0, 4)) : undefined;
   const youtubeIds = collectClaimValues(claims.P1651);
   const archiveIds = collectClaimValues(claims.P724);
+  const vimeoIds = collectClaimValues(claims.P4015);
   const libreflixIds = collectClaimValues(claims.P6614);
+  const directorIds = collectClaimValues(claims.P57);
+  const countryIds = collectClaimValues(claims.P495);
   const licenseClaim = extractClaimValue(claims.P275?.[0]);
   const durationClaim = parseDurationSeconds(claims.P2047?.[0]);
   const genreIds = collectClaimValues(claims.P136);
@@ -331,10 +334,11 @@ const mapEntityToContent = (entity: WikidataEntity): Content | null => {
 
   const primaryVideo = videoClaims[0];
 
-  const altVideos: Array<{ kind: 'commons' | 'youtube' | 'archive' | 'libreflix'; url: string; label?: string; lang?: string }> = [];
+  const altVideos: Array<{ kind: 'commons' | 'youtube' | 'archive' | 'libreflix' | 'vimeo'; url: string; label?: string; lang?: string }> = [];
   videoClaims.slice(1).forEach((v) => altVideos.push({ kind: 'commons', url: v.url, label: v.lang ? `${v.lang}` : undefined, lang: v.lang }));
   youtubeIds.forEach((id) => altVideos.push({ kind: 'youtube', url: `https://www.youtube.com/watch?v=${id}`, label: 'YouTube' }));
   archiveIds.forEach((id) => altVideos.push({ kind: 'archive', url: `https://archive.org/details/${id}`, label: 'Internet Archive' }));
+  vimeoIds.forEach((id) => altVideos.push({ kind: 'vimeo', url: `https://vimeo.com/${id}`, label: 'Vimeo' }));
 
   const libreSlug = libreflixIds[0];
   if (libreSlug) {
@@ -352,6 +356,8 @@ const mapEntityToContent = (entity: WikidataEntity): Content | null => {
 
   const isTrailer = /trailer/i.test(title) || videoClaims.some((v) => /trailer/i.test(v.url));
   const durationSeconds = durationClaim;
+  const directors = directorIds.map((id) => labelMap[id]).filter(Boolean);
+  const countries = countryIds.map((id) => labelMap[id]).filter(Boolean);
 
   return {
     id: entity.id,
@@ -372,6 +378,8 @@ const mapEntityToContent = (entity: WikidataEntity): Content | null => {
     wikipediaUrl,
     license: licenseClaim,
     durationSeconds,
+    directors: directors.length ? directors : undefined,
+    countries: countries.length ? countries : undefined,
     isTrailer,
     genres: mapGenreTags(genreIds),
     cast: undefined,
@@ -435,7 +443,39 @@ const fetchEntitiesByIds = async (entityIds: string[], limitLang = 'en|it'): Pro
   if (!detailRes.ok) throw new Error(`wbgetentities ${detailRes.status}`);
   const detailJson = await detailRes.json();
   const entities: WikidataEntity[] = Object.values(detailJson.entities || {});
-  const mapped = entities.map(mapEntityToContent).filter((c): c is Content => Boolean(c));
+
+  const labelMap: Record<string, string> = {};
+  const addLabelsToMap = (items: any[]) => {
+    items.forEach((e) => {
+      const label = e.labels?.it?.value || e.labels?.en?.value || Object.values(e.labels || {})[0]?.value;
+      if (label) labelMap[e.id] = label;
+    });
+  };
+
+  addLabelsToMap(entities);
+
+  const extraIds = new Set<string>();
+  entities.forEach((e) => {
+    const claims = e.claims || {};
+    collectClaimValues(claims.P57).forEach((id) => {
+      if (/^Q\d+/.test(id)) extraIds.add(id);
+    });
+    collectClaimValues(claims.P495).forEach((id) => {
+      if (/^Q\d+/.test(id)) extraIds.add(id);
+    });
+  });
+
+  if (extraIds.size > 0) {
+    const extraUrl = `${WIKIDATA_API}?action=wbgetentities&format=json&languages=${limitLang}&props=labels&origin=*&ids=${Array.from(extraIds).join('|')}`;
+    const extraRes = await fetch(extraUrl);
+    if (extraRes.ok) {
+      const extraJson = await extraRes.json();
+      const extraEntities: any[] = Object.values(extraJson.entities || {});
+      addLabelsToMap(extraEntities);
+    }
+  }
+
+  const mapped = entities.map((e) => mapEntityToContent(e, labelMap)).filter((c): c is Content => Boolean(c));
   return mapped.filter((c) => c.videoUrl && c.videoUrl.trim());
 };
 

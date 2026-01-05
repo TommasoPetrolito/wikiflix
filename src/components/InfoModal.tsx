@@ -124,6 +124,18 @@ export const InfoModal = ({ content, onClose, onPlay }: InfoModalProps) => {
                 <a className="info-meta-link" href={content.commonsLink} target="_blank" rel="noreferrer">Pagina del file</a>
               </div>
             )}
+            {content.directors?.length ? (
+              <div className="info-meta">
+                <div className="info-meta-label">Regia</div>
+                <div className="info-meta-value">{content.directors.join(', ')}</div>
+              </div>
+            ) : null}
+            {content.countries?.length ? (
+              <div className="info-meta">
+                <div className="info-meta-label">Paesi</div>
+                <div className="info-meta-value">{content.countries.join(', ')}</div>
+              </div>
+            ) : null}
             {content.wikidataId && (
               <div className="info-meta">
                 <div className="info-meta-label">Wikidata</div>

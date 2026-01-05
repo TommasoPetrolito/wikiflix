@@ -182,6 +182,21 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
     return `https://www.youtube-nocookie.com/embed/${id}?${qs.toString()}`;
   };
 
+  const extractVimeoId = (url: string): string | null => {
+    try {
+      const u = new URL(url);
+      if (u.hostname.includes('vimeo.com')) {
+        const parts = u.pathname.split('/').filter(Boolean);
+        const last = parts[parts.length - 1];
+        if (last && /^\d+$/.test(last)) return last;
+      }
+    } catch (e) {
+      // ignore
+    }
+    const m = url.match(/vimeo\.com\/(\d+)/);
+    return m ? m[1] : null;
+  };
+
   const extractArchiveId = (url: string): string | null => {
     try {
       const u = new URL(url);
@@ -203,7 +218,7 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
     label: string;
     url: string;
     embedUrl?: string;
-    kind: 'commons' | 'youtube' | 'archive' | 'direct' | 'libreflix';
+    kind: 'commons' | 'youtube' | 'archive' | 'direct' | 'libreflix' | 'vimeo';
     prefersIframe: boolean;
     lang?: string;
   };
@@ -235,6 +250,20 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
           url: v.url,
           embedUrl,
           kind: 'youtube',
+          prefersIframe: Boolean(embedUrl),
+          lang: v.lang,
+        });
+        return;
+      }
+      if (v.kind === 'vimeo') {
+        const vimeoId = extractVimeoId(v.url);
+        const embedUrl = vimeoId ? `https://player.vimeo.com/video/${vimeoId}` : undefined;
+        list.push({
+          key: `alt-${idx}-${v.url}`,
+          label: v.label || 'Vimeo',
+          url: v.url,
+          embedUrl,
+          kind: 'vimeo',
           prefersIframe: Boolean(embedUrl),
           lang: v.lang,
         });
