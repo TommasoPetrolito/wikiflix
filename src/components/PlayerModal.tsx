@@ -489,6 +489,12 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
               ))}
               {content.durationSeconds && <span className="player-pill">{formatDuration(content.durationSeconds)}</span>}
               {content.language && <span className="player-pill">Lang: {content.language}</span>}
+              {content.directors?.length ? (
+                <span className="player-pill">{content.directors.slice(0, 2).join(', ')}</span>
+              ) : null}
+              {content.countries?.length ? (
+                <span className="player-pill subtle">{content.countries.slice(0, 2).join(', ')}</span>
+              ) : null}
               {content.isTrailer && <span className="player-pill">Trailer</span>}
               {subtitleTracks.length > 0 && <span className="player-pill subtle">{subtitleTracks.length} sub</span>}
               {sources.length > 1 && <span className="player-pill subtle">{sources.length} fonti</span>}

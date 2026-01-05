@@ -206,7 +206,7 @@ export const Hero = ({ content, onPlay, onInfo }: HeroProps) => {
           {currentContent.directors?.length ? (
             <>
               <span className="separator">•</span>
-              <span>Dir: {currentContent.directors.slice(0, 2).join(', ')}</span>
+              <span>{currentContent.directors.slice(0, 2).join(', ')}</span>
             </>
           ) : null}
           {currentContent.countries?.length ? (
