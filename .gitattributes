@@ -1,7 +1,0 @@
-# Catalog artifacts stored with Git LFS
-data/catalog/*.jsonl filter=lfs diff=lfs merge=lfs -text
-data/catalog/*_embeddings.f32 filter=lfs diff=lfs merge=lfs -text
-data/catalog/*_hnsw.index filter=lfs diff=lfs merge=lfs -text
-data/catalog/*_ids.txt filter=lfs diff=lfs merge=lfs -text
-data/catalog/*_manifest.json filter=lfs diff=lfs merge=lfs -text
-data/catalog/labels_cache.jsonl filter=lfs diff=lfs merge=lfs -text
