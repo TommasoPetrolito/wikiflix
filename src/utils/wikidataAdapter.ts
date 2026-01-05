@@ -124,11 +124,6 @@ const GENRE_QUERY_MAP: Record<number, string[]> = {
   10765: ['science fiction television film trailer', 'science fiction tv trailer'],
 };
 
-// Optional manual Libreflix mapping: Wikidata Q-id -> Libreflix slug
-const LIBREFLIX_BY_ID: Record<string, string> = {
-  Q151895: 'nosferatu-1922',
-};
-
 const categoryCache = new Map<string, Content[]>();
 const inflightCategory = new Map<string, Promise<Content[]>>();
 
@@ -341,7 +336,7 @@ const mapEntityToContent = (entity: WikidataEntity): Content | null => {
   youtubeIds.forEach((id) => altVideos.push({ kind: 'youtube', url: `https://www.youtube.com/watch?v=${id}`, label: 'YouTube' }));
   archiveIds.forEach((id) => altVideos.push({ kind: 'archive', url: `https://archive.org/details/${id}`, label: 'Internet Archive' }));
 
-  const libreSlug = libreflixIds[0] || LIBREFLIX_BY_ID[entity.id];
+  const libreSlug = libreflixIds[0];
   if (libreSlug) {
     altVideos.push({
       kind: 'libreflix',
