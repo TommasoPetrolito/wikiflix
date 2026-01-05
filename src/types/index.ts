@@ -8,6 +8,12 @@ export interface Content {
   description: string;
   videoUrl?: string;
   subtitles?: string;
+  wikidataId?: string;
+  commonsLink?: string;
+  altVideos?: Array<{ kind: 'commons' | 'youtube' | 'archive'; url: string; label?: string }>;
+  license?: string;
+  durationSeconds?: number;
+  isTrailer?: boolean;
   genres?: string[];
   cast?: string[];
   season?: number;

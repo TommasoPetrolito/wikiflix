@@ -194,14 +194,22 @@ type WikidataEntity = {
   claims?: Record<string, any[]>;
 };
 
-const extractClaimValue = (claims: any[] | undefined): string | undefined => {
-  const val = claims?.[0]?.mainsnak?.datavalue?.value;
+const extractClaimValue = (snak: any): string | undefined => {
+  const val = snak?.mainsnak?.datavalue?.value;
   if (!val) return undefined;
   if (typeof val === 'string') return val;
   if (val.entity?.id) return val.entity.id;
   if (val.id) return val.id;
   if (val.text) return val.text;
+  if (val.amount) return String(val.amount);
   return undefined;
+};
+
+const collectClaimValues = (claims: any[] | undefined): string[] => {
+  if (!claims) return [];
+  return claims
+    .map((c) => extractClaimValue(c))
+    .filter((v): v is string => Boolean(v));
 };
 
 const mapEntityToContent = (entity: WikidataEntity): Content | null => {
@@ -210,25 +218,51 @@ const mapEntityToContent = (entity: WikidataEntity): Content | null => {
 
   const desc = entity.descriptions?.it?.value || entity.descriptions?.en?.value;
   const claims = entity.claims || {};
-  const videoClaim = extractClaimValue(claims.P10);
-  const imageClaim = extractClaimValue(claims.P18);
-  const subtitleClaim = extractClaimValue(claims.P1173);
-  const dateClaim = extractClaimValue(claims.P577);
+  const videoClaims = collectClaimValues(claims.P10);
+  const imageClaim = extractClaimValue(claims.P18?.[0]);
+  const subtitleClaim = extractClaimValue(claims.P1173?.[0]);
+  const dateClaim = extractClaimValue(claims.P577?.[0]);
   const year = dateClaim && typeof dateClaim === 'string' ? Number(dateClaim.slice(0, 4)) : undefined;
+  const youtubeIds = collectClaimValues(claims.P1651);
+  const archiveIds = collectClaimValues(claims.P724);
+  const licenseClaim = extractClaimValue(claims.P275?.[0]);
+  const durationClaim = extractClaimValue(claims.P2047?.[0]);
 
   // Skip non-media (no video)
-  if (!videoClaim) return null;
+  if (!videoClaims.length) return null;
+
+  const commonsVideos = videoClaims.map(toCommonsFilePath).filter(Boolean);
+  const primaryVideo = commonsVideos[0];
+
+  const altVideos: Array<{ kind: 'commons' | 'youtube' | 'archive'; url: string; label?: string }> = [];
+  commonsVideos.slice(1).forEach((u) => altVideos.push({ kind: 'commons', url: u }));
+  youtubeIds.forEach((id) => altVideos.push({ kind: 'youtube', url: `https://www.youtube.com/watch?v=${id}`, label: 'YouTube' }));
+  archiveIds.forEach((id) => altVideos.push({ kind: 'archive', url: `https://archive.org/details/${id}`, label: 'Internet Archive' }));
+
+  const commonsLink = entity.sitelinks?.commonswiki?.url
+    || (entity.sitelinks?.commonswiki?.title
+      ? `https://commons.wikimedia.org/wiki/${encodeURIComponent(entity.sitelinks.commonswiki.title)}`
+      : undefined);
+
+  const isTrailer = /trailer/i.test(title) || videoClaims.some((v) => /trailer/i.test(v));
+  const durationSeconds = durationClaim && !Number.isNaN(Number(durationClaim)) ? Number(durationClaim) : undefined;
 
   return {
     id: entity.id,
+    wikidataId: entity.id,
     title,
     type: 'movie',
     year,
     poster: toCommonsFilePath(imageClaim) || FALLBACK_POSTER,
     backdrop: toCommonsFilePath(imageClaim) || FALLBACK_BACKDROP,
     description: desc || 'Result from Wikidata',
-    videoUrl: toCommonsFilePath(videoClaim) || '',
+    videoUrl: primaryVideo || '',
     subtitles: subtitleClaim ? toCommonsFilePath(String(subtitleClaim)) : undefined,
+    altVideos: altVideos.length ? altVideos : undefined,
+    commonsLink,
+    license: licenseClaim,
+    durationSeconds,
+    isTrailer,
     genres: undefined,
     cast: undefined,
   };
@@ -259,7 +293,7 @@ const searchViaMediaWiki = async (query: string, limit = 4): Promise<Content[]> 
 
     if (entityIds.length === 0) return [];
 
-    const detailUrl = `${WIKIDATA_API}?action=wbgetentities&format=json&languages=en|it&props=labels|descriptions|claims&origin=*&ids=${entityIds.join('|')}`;
+    const detailUrl = `${WIKIDATA_API}?action=wbgetentities&format=json&languages=en|it&props=labels|descriptions|claims|sitelinks&origin=*&ids=${entityIds.join('|')}`;
     const detailRes = await fetch(detailUrl);
     if (!detailRes.ok) throw new Error(`wbgetentities ${detailRes.status}`);
     const detailJson = await detailRes.json();
