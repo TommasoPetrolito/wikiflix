@@ -3,26 +3,16 @@ import ReactDOM from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import App from './App.tsx'
 import SearchPage from './pages/SearchPage.tsx'
-import SportsPage from './pages/SportsPage.tsx'
 import AIPage from './pages/AIPage.tsx'
 import { ThemeProvider } from './contexts/ThemeContext.tsx'
 import { LanguageProvider } from './contexts/LanguageContext.tsx'
 import './index.css'
 
-const router = createBrowserRouter(
-  [
-    { path: '/', element: <App /> },
-    { path: '/search', element: <SearchPage /> },
-    { path: '/sports', element: <SportsPage /> },
-    { path: '/ai', element: <AIPage /> },
-  ],
-  {
-    future: {
-      v7_startTransition: true,
-      v7_relativeSplatPath: true,
-    },
-  }
-)
+const router = createBrowserRouter([
+  { path: '/', element: <App /> },
+  { path: '/search', element: <SearchPage /> },
+  { path: '/ai', element: <AIPage /> },
+])
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -30,7 +20,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <ThemeProvider>
         <RouterProvider
           router={router}
-          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
         />
       </ThemeProvider>
     </LanguageProvider>

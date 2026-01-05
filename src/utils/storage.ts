@@ -49,40 +49,8 @@ export const addToContinueWatching = (content: Content): void => {
   saveContinueWatching(watching);
 };
 
-// One-time data migration for known incorrect IDs in older builds
-export const migrateKnownFixes = (): void => {
-  // Fix The Sopranos TMDB id (was 2288 -> correct 1398)
-  const oldSopranosId = 2288;
-  const newSopranosId = 1398;
-
-  // Continue Watching list
-  const cw = getContinueWatching();
-  let changed = false;
-  const migrated = cw.map((item) => {
-    if (item.type === 'tv' && item.title === 'The Sopranos' && item.id !== newSopranosId) {
-      changed = true;
-      return { ...item, id: newSopranosId } as Content;
-    }
-    return item;
-  });
-  if (changed) saveContinueWatching(migrated);
-
-  // Progress keys
-  try {
-    const oldKey = `progress_tv_${oldSopranosId}`;
-    const newKey = `progress_tv_${newSopranosId}`;
-    const oldData = localStorage.getItem(oldKey);
-    const hasNew = localStorage.getItem(newKey);
-    if (oldData && !hasNew) {
-      const parsed = JSON.parse(oldData);
-      parsed.id = newSopranosId;
-      localStorage.setItem(newKey, JSON.stringify(parsed));
-      localStorage.removeItem(oldKey);
-    }
-  } catch {
-    // ignore
-  }
-};
+// Legacy migration removed (TMDB IDs no longer used).
+export const migrateKnownFixes = (): void => {};
 
 // Intro markers per TV show (user-defined once)
 export interface IntroMarkers {

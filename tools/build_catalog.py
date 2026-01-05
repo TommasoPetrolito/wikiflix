@@ -19,6 +19,7 @@ import math
 import pathlib
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional, Sequence
 
@@ -89,20 +90,92 @@ HEADERS = {
 }
 
 
+def log(msg: str) -> None:
+    print(f"[build_catalog] {msg}")
+
+LABEL_LANGS = [
+    "en",
+    "es",
+    "fr",
+    "de",
+    "it",
+    "pt",
+    "ru",
+    "zh",
+    "ja",
+    "ko",
+    "ar",
+    "hi",
+    "bn",
+    "tr",
+    "nl",
+    "sv",
+    "pl",
+    "uk",
+    "cs",
+    "ro",
+    "el",
+    "he",
+    "id",
+    "vi",
+    "th",
+    "fa",
+    "bg",
+    "hr",
+    "da",
+    "et",
+    "fi",
+    "hu",
+    "ga",
+    "lv",
+    "lt",
+    "mt",
+    "sk",
+    "sl",
+]
+
+
+def to_qid(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    if value.startswith("Q"):
+        return value
+    return pathlib.Path(value).name if "/" in value else value
+
+
+def pick_label(label_map: Dict[str, str], preferred: Sequence[str] = LABEL_LANGS) -> Optional[str]:
+    for lang in preferred:
+        if label_map.get(lang):
+            return label_map[lang]
+    return next(iter(label_map.values()), None)
+
+
+def shorten_text(text: str, sentences: int = 2) -> str:
+    parts = text.split(". ")
+    if len(parts) <= sentences:
+        return text.strip()
+    return ". ".join(parts[:sentences]).strip()
+
+
 @dataclass
 class CatalogItem:
     id: str
     title: str
+    title_labels: Dict[str, str]
     description: str
     description_long: str
+    descriptions: Dict[str, str]
     year: Optional[int]
     poster: Optional[str]
     backdrop: Optional[str]
     video_url: Optional[str]
     alt_videos: List[Dict]
-    directors: List[str]
-    countries: List[str]
-    genres: List[str]
+    director_ids: List[str]
+    genre_ids: List[str]
+    instance_ids: List[str]
+    language_ids: List[str]
+    country_ids: List[str]
+    license_id: Optional[str]
     license: Optional[str]
     language: Optional[str]
 
@@ -122,7 +195,12 @@ def fetch_sparql(query: str, endpoint: str = WIKIDATA_SPARQL, timeout: int = 60)
 def split_ids(value: Optional[str]) -> List[str]:
     if not value:
         return []
-    return [v for v in value.split(",") if v]
+    out = []
+    for v in value.split(","):
+        qid = to_qid(v)
+        if qid:
+            out.append(qid)
+    return out
 
 
 def commons_to_filepath(url: Optional[str]) -> Optional[str]:
@@ -133,53 +211,247 @@ def commons_to_filepath(url: Optional[str]) -> Optional[str]:
     return f"https://commons.wikimedia.org/wiki/Special:FilePath/{requests.utils.quote(pathlib.Path(url).name)}"
 
 
+def load_labels_cache(path: pathlib.Path) -> Dict[str, Dict[str, str]]:
+    if not path.exists():
+        return {}
+    cache: Dict[str, Dict[str, str]] = {}
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            try:
+                row = json.loads(line)
+                qid = row.get("id")
+                labels = row.get("labels") or {}
+                if qid and isinstance(labels, dict):
+                    cache[qid] = {k: v for k, v in labels.items() if isinstance(v, str)}
+            except Exception:
+                continue
+    return cache
+
+
+def save_labels_cache(path: pathlib.Path, labels: Dict[str, Dict[str, str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        for qid, label_map in labels.items():
+            f.write(json.dumps({"id": qid, "labels": label_map}, ensure_ascii=False) + "\n")
+
+
+def load_existing_summaries_from_catalog(path: pathlib.Path) -> Dict[str, Dict[str, str]]:
+    if not path.exists():
+        return {}
+    summaries: Dict[str, Dict[str, str]] = {}
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            try:
+                row = json.loads(line)
+                qid = row.get("id")
+                descs = row.get("descriptions") or {}
+                if qid and isinstance(descs, dict) and descs:
+                    summaries[qid] = {k: v for k, v in descs.items() if isinstance(v, str)}
+            except Exception:
+                continue
+    return summaries
+
+
 def collect_label_ids(rows: List[dict]) -> List[str]:
     ids: set[str] = set()
     for r in rows:
-        for key in ("directorID", "genreIDs", "licenseIDs", "languageIDs", "countryIDs"):
+        for key in ("item", "directorID", "instanceIDs", "genreIDs", "licenseIDs", "languageIDs", "countryIDs"):
             val = r.get(key, {}).get("value")
+            if not val:
+                continue
             if key.endswith("IDs"):
                 ids.update(split_ids(val))
             else:
-                if val:
-                    ids.add(val)
+                qid = to_qid(val)
+                if qid:
+                    ids.add(qid)
     return [i for i in ids if i.startswith("Q")]
 
 
-def fetch_labels(ids: Sequence[str], languages: str = "en|it") -> Dict[str, str]:
-    out: Dict[str, str] = {}
+def fetch_labels(ids: Sequence[str], languages: Sequence[str]) -> Dict[str, Dict[str, str]]:
+    out: Dict[str, Dict[str, str]] = {}
     if not ids:
         return out
-    chunk_size = 200
-    for i in range(0, len(ids), chunk_size):
+    chunk_size = 50  # Wikidata API limit for ids param when using wbgetentities
+    langs_param = "|".join(languages)
+    total_chunks = math.ceil(len(ids) / chunk_size)
+    session = requests.Session()
+    for i in tqdm(range(0, len(ids), chunk_size), total=total_chunks, desc="labels", unit="chunk"):
         chunk = ids[i : i + chunk_size]
-        url = f"{WIKIDATA_API}?action=wbgetentities&format=json&languages={languages}&props=labels&ids={'|'.join(chunk)}"
+        params = {
+            "action": "wbgetentities",
+            "format": "json",
+            "languages": langs_param,
+            "props": "labels",
+            "ids": "|".join(chunk),
+        }
+        try:
+            res = session.get(WIKIDATA_API, params=params, headers=HEADERS, timeout=60)
+        except Exception as e:
+            log(f"Label fetch failed (chunk {i//chunk_size+1}/{total_chunks}): {e}")
+            continue
+        if not res.ok:
+            log(f"Label fetch HTTP {res.status_code} (chunk {i//chunk_size+1}/{total_chunks})")
+            continue
+        data = res.json()
+        if "error" in data:
+            log(f"Label fetch API error (chunk {i//chunk_size+1}/{total_chunks}): {data.get('error')}")
+            continue
+        entities = data.get("entities", {})
+        for qid, entity in entities.items():
+            labels = entity.get("labels", {})
+            lang_map: Dict[str, str] = {}
+            for lang in languages:
+                val = labels.get(lang, {}).get("value")
+                if val:
+                    lang_map[lang] = val
+            if lang_map:
+                out[qid] = lang_map
+    return out
+
+
+def fetch_sitelinks(ids: Sequence[str], languages: Sequence[str]) -> Dict[str, Dict[str, str]]:
+    out: Dict[str, Dict[str, str]] = {}
+    if not ids:
+        return out
+    chunk_size = 50
+    sites = [f"{lang}wiki" for lang in languages]
+    sitefilter = "|".join(sites)
+    total_chunks = math.ceil(len(ids) / chunk_size)
+    for i in tqdm(range(0, len(ids), chunk_size), total=total_chunks, desc="sitelinks", unit="chunk"):
+        chunk = ids[i : i + chunk_size]
+        url = f"{WIKIDATA_API}?action=wbgetentities&format=json&props=sitelinks&ids={'|'.join(chunk)}&sitefilter={sitefilter}"
         res = requests.get(url, headers=HEADERS, timeout=60)
         if not res.ok:
             continue
         data = res.json().get("entities", {})
         for qid, entity in data.items():
-            labels = entity.get("labels", {})
-            label = labels.get("it", {}).get("value") or labels.get("en", {}).get("value")
-            if not label and labels:
-                label = next(iter(labels.values())).get("value")
-            if label:
-                out[qid] = label
+            links = entity.get("sitelinks", {})
+            lang_map: Dict[str, str] = {}
+            for site, meta in links.items():
+                if not site.endswith("wiki"):
+                    continue
+                lang = site.replace("wiki", "")
+                if lang in languages and meta.get("title"):
+                    lang_map[lang] = meta["title"]
+            if lang_map:
+                out[qid] = lang_map
     return out
+
+
+def _fetch_wiki_extract(session: requests.Session, lang: str, title: str, exchars: int) -> Optional[str]:
+    # Primary: query API with character cap and redirects
+    url = f"https://{lang}.wikipedia.org/w/api.php"
+    params = {
+        "action": "query",
+        "prop": "extracts",
+        "explaintext": 1,
+        "exchars": exchars,
+        "redirects": 1,
+        "format": "json",
+        "titles": title,
+    }
+    res = session.get(url, params=params, headers=HEADERS, timeout=30)
+    if res.ok:
+        pages = res.json().get("query", {}).get("pages", {})
+        page = next(iter(pages.values()), {})
+        extract = page.get("extract")
+        if extract:
+            return extract.strip()
+
+    # Fallback: REST summary endpoint (usually shorter intro)
+    summary_url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{requests.utils.quote(title)}"
+    res2 = session.get(summary_url, headers=HEADERS, timeout=20)
+    if res2.ok:
+        extract2 = res2.json().get("extract")
+        if extract2:
+            return str(extract2).strip()
+
+    return None
+
+
+def fetch_wikipedia_summaries(
+    sitelinks: Dict[str, Dict[str, str]],
+    languages: Sequence[str],
+    exchars: int = 2600,
+    base_summaries: Optional[Dict[str, Dict[str, str]]] = None,
+) -> Dict[str, Dict[str, str]]:
+    summaries: Dict[str, Dict[str, str]] = {
+        qid: {**langs} for qid, langs in (base_summaries or {}).items()
+    }
+    session = requests.Session()
+
+    tasks = []
+    for qid, sites in sitelinks.items():
+        for lang in languages:
+            title = sites.get(lang)
+            if not title:
+                continue
+            if lang in summaries.get(qid, {}):
+                continue
+            tasks.append((qid, lang, title))
+
+    log(
+        f"Fetching Wikipedia summaries: {len(tasks)} requests across {len(languages)} languages (threads=4, exchars={exchars})"
+    )
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = [
+            pool.submit(
+                lambda qid=qid, lang=lang, title=title: (
+                    qid,
+                    lang,
+                    _fetch_wiki_extract(session, lang, title, exchars),
+                )
+            )
+            for qid, lang, title in tasks
+        ]
+
+        with tqdm(total=len(futures), desc="wiki summaries", unit="req") as pbar:
+            for future in as_completed(futures):
+                try:
+                    qid, lang, extract = future.result()
+                    if extract:
+                        summaries.setdefault(qid, {})[lang] = extract
+                except Exception:
+                    pass
+                finally:
+                    pbar.update(1)
+
+    have_any = len(summaries)
+    have_en = sum(1 for v in summaries.values() if "en" in v)
+    log(f"Wikipedia summaries ready for {have_any} items (with EN: {have_en})")
+    return summaries
 
 
 def binding_val(b: dict, key: str) -> Optional[str]:
     return b.get(key, {}).get("value")
 
 
-def build_catalog(rows: List[dict], labels: Dict[str, str]) -> List[CatalogItem]:
+def build_catalog(
+    rows: List[dict],
+    labels: Dict[str, Dict[str, str]],
+    sitelinks: Dict[str, Dict[str, str]],
+    summaries: Dict[str, Dict[str, str]],
+) -> List[CatalogItem]:
     items: List[CatalogItem] = []
     for r in rows:
-        qid = binding_val(r, "item")
-        title = binding_val(r, "itemLabel")
-        if not qid or not title:
+        qid = to_qid(binding_val(r, "item"))
+        if not qid:
             continue
-        desc = binding_val(r, "itemDescription") or ""
+        title_labels = labels.get(qid, {})
+        title = pick_label(title_labels) or binding_val(r, "itemLabel")
+        if not title:
+            continue
+
+        desc_label = binding_val(r, "itemDescription") or ""
+        wiki_descs = summaries.get(qid, {})
+        if desc_label and "en" not in wiki_descs:
+            wiki_descs = {**wiki_descs, "en": desc_label}
+        desc_long = wiki_descs.get("en") or desc_label
+        desc_short = shorten_text(desc_long) if desc_long else desc_label
+        descriptions = wiki_descs if wiki_descs else ({"en": desc_label} if desc_label else {})
+
         year_raw = binding_val(r, "year")
         year = int(year_raw) if year_raw and year_raw.isdigit() else None
         poster = commons_to_filepath(binding_val(r, "image"))
@@ -190,7 +462,7 @@ def build_catalog(rows: List[dict], labels: Dict[str, str]) -> List[CatalogItem]
         libreflix = binding_val(r, "libreflixID")
         ia = binding_val(r, "iaID")
 
-        video_url = commons or (libreflix and f"https://libreflix.org/assistir/{libreflix}") or None
+        video_url = commons or (libreflix and f"https://libreflix.org/i/{libreflix}") or None
         alt_videos: List[Dict] = []
         if commons:
             alt_videos.append({"kind": "commons", "url": commons})
@@ -199,40 +471,40 @@ def build_catalog(rows: List[dict], labels: Dict[str, str]) -> List[CatalogItem]
         if vimeo:
             alt_videos.append({"kind": "vimeo", "url": f"https://vimeo.com/{vimeo}", "label": "Vimeo"})
         if libreflix:
-            alt_videos.append({"kind": "libreflix", "url": f"https://libreflix.org/assistir/{libreflix}", "label": "Libreflix"})
+            alt_videos.append({"kind": "libreflix", "url": f"https://libreflix.org/i/{libreflix}", "label": "Libreflix"})
         if ia:
             alt_videos.append({"kind": "archive", "url": f"https://archive.org/details/{ia}", "label": "Internet Archive"})
 
-        directors = [labels.get(d) for d in split_ids(binding_val(r, "directorID")) if labels.get(d)]
-        countries = [labels.get(c) for c in split_ids(binding_val(r, "countryIDs")) if labels.get(c)]
-        genres = [labels.get(g) for g in split_ids(binding_val(r, "genreIDs")) if labels.get(g)]
-        license_label = None
-        license_ids = split_ids(binding_val(r, "licenseIDs"))
-        for lid in license_ids:
-            if labels.get(lid):
-                license_label = labels[lid]
-                break
-        language_label = None
+        director_ids = split_ids(binding_val(r, "directorID"))
+        genre_ids = split_ids(binding_val(r, "genreIDs"))
+        instance_ids = split_ids(binding_val(r, "instanceIDs"))
         language_ids = split_ids(binding_val(r, "languageIDs"))
-        for lang_id in language_ids:
-            if labels.get(lang_id):
-                language_label = labels[lang_id]
-                break
+        country_ids = split_ids(binding_val(r, "countryIDs"))
+        license_ids = split_ids(binding_val(r, "licenseIDs"))
+
+        license_id = license_ids[0] if license_ids else None
+        license_label = pick_label(labels.get(license_id, {})) if license_id else None
+        language_label = pick_label(labels.get(language_ids[0], {})) if language_ids else None
 
         items.append(
             CatalogItem(
                 id=qid,
                 title=title,
-                description=desc,
-                description_long=desc,
+                title_labels=title_labels,
+                description=desc_short or desc_label,
+                description_long=desc_long or desc_label,
+                descriptions=descriptions,
                 year=year,
                 poster=poster,
                 backdrop=poster,
                 video_url=video_url,
                 alt_videos=alt_videos,
-                directors=directors,
-                countries=countries,
-                genres=genres,
+                director_ids=director_ids,
+                genre_ids=genre_ids,
+                instance_ids=instance_ids,
+                language_ids=language_ids,
+                country_ids=country_ids,
+                license_id=license_id,
                 license=license_label,
                 language=language_label,
             )
@@ -240,25 +512,51 @@ def build_catalog(rows: List[dict], labels: Dict[str, str]) -> List[CatalogItem]
     return items
 
 
-def to_jsonl(items: Iterable[CatalogItem], path: pathlib.Path) -> None:
+def to_jsonl(items: Iterable[CatalogItem], labels: Dict[str, Dict[str, str]], path: pathlib.Path) -> None:
+    def tag_entries(ids: List[str]) -> Optional[List[Dict]]:
+        if not ids:
+            return None
+        entries = []
+        for qid in ids:
+            label_map = labels.get(qid, {})
+            entries.append(
+                {
+                    "id": qid,
+                    "label": pick_label(label_map),
+                    "labels": label_map or None,
+                }
+            )
+        return entries
+
     with path.open("w", encoding="utf-8") as f:
         for it in items:
             obj = {
                 "id": it.id,
                 "wikidataId": it.id,
                 "title": it.title,
+                "titleLabels": it.title_labels or None,
                 "description": it.description,
                 "descriptionLong": it.description_long,
+                "descriptions": it.descriptions or None,
                 "type": "movie",
                 "year": it.year,
                 "poster": it.poster,
                 "backdrop": it.backdrop,
                 "videoUrl": it.video_url,
                 "altVideos": it.alt_videos or None,
-                "directors": it.directors or None,
-                "countries": it.countries or None,
-                "genres": it.genres or None,
+                "directorIds": it.director_ids or None,
+                "genreIds": it.genre_ids or None,
+                "instanceIds": it.instance_ids or None,
+                "languageIds": it.language_ids or None,
+                "countryIds": it.country_ids or None,
+                "directors": tag_entries(it.director_ids),
+                "genres": tag_entries(it.genre_ids),
+                "instances": tag_entries(it.instance_ids),
+                "languages": tag_entries(it.language_ids),
+                "countries": tag_entries(it.country_ids),
+                "licenseId": it.license_id,
                 "license": it.license,
+                "licenseLabels": labels.get(it.license_id) if it.license_id else None,
                 "language": it.language,
             }
             f.write(json.dumps({k: v for k, v in obj.items() if v is not None}, ensure_ascii=False) + "\n")
@@ -269,7 +567,10 @@ def build_embeddings(items: Sequence[CatalogItem], model_name: str, batch_size: 
     texts = []
     for it in items:
         parts = [it.title]
-        if it.description_long:
+        en_desc = it.descriptions.get("en") if it.descriptions else None
+        if en_desc:
+            parts.append(en_desc)
+        elif it.description_long:
             parts.append(it.description_long)
         elif it.description:
             parts.append(it.description)
@@ -317,6 +618,23 @@ def write_manifest(manifest_path: pathlib.Path, model: str, dim: int, catalog: s
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build static catalog and ANN index from Wikidata")
     parser.add_argument("--out", type=pathlib.Path, default=pathlib.Path("data/catalog"), help="Output directory")
+    parser.add_argument(
+        "--catalog-input",
+        type=pathlib.Path,
+        default=None,
+        help="Existing catalog file to reuse summaries from (optional; default is live fetch)",
+    )
+    parser.add_argument(
+        "--labels-cache",
+        type=pathlib.Path,
+        default=pathlib.Path("data/catalog/labels_cache.jsonl"),
+        help="JSONL cache of QID -> labels across languages",
+    )
+    parser.add_argument(
+        "--basename",
+        default="catalog_v2",
+        help="Base name for newly generated artifacts (catalog, embeddings, index, ids, manifest)",
+    )
     parser.add_argument("--query", type=pathlib.Path, help="Path to SPARQL query file (defaults to built-in)")
     parser.add_argument("--endpoint", default=WIKIDATA_SPARQL, help="SPARQL endpoint")
     parser.add_argument("--model", default="intfloat/multilingual-e5-small", help="SentenceTransformer model")
@@ -330,37 +648,63 @@ def main() -> int:
     if args.query:
         query_text = args.query.read_text(encoding="utf-8")
 
-    print("Fetching SPARQL results…")
+    log("Fetching SPARQL results…")
     rows = fetch_sparql(query_text, endpoint=args.endpoint)
-    print(f"Rows fetched: {len(rows)}")
+    log(f"Rows fetched: {len(rows)}")
     if not rows:
         print("No data returned; aborting", file=sys.stderr)
         return 1
 
     label_ids = collect_label_ids(rows)
-    print(f"Fetching labels for {len(label_ids)} ids…")
-    labels = fetch_labels(label_ids)
+    cached_labels = load_labels_cache(args.labels_cache)
+    missing_label_ids = [qid for qid in label_ids if qid not in cached_labels]
+    log(
+        f"Fetching labels for {len(missing_label_ids)} missing ids (cached={len(cached_labels)}) across {len(LABEL_LANGS)} languages…"
+    )
+    fresh_labels = fetch_labels(missing_label_ids, languages=LABEL_LANGS) if missing_label_ids else {}
+    labels = {**cached_labels, **fresh_labels}
+    save_labels_cache(args.labels_cache, labels)
+    log(f"Labels ready: {len(labels)} ids (cache saved at {args.labels_cache})")
 
-    catalog_items = build_catalog(rows, labels)
-    catalog_path = args.out / "catalog.jsonl"
-    to_jsonl(catalog_items, catalog_path)
-    print(f"Wrote catalog: {catalog_path} ({len(catalog_items)} items)")
+    item_ids = [qid for r in rows for qid in [to_qid(binding_val(r, "item"))] if qid]
+    log(f"Fetching sitelinks for {len(item_ids)} items across {len(LABEL_LANGS)} languages…")
+    sitelinks = fetch_sitelinks(item_ids, languages=LABEL_LANGS)
+    log(f"Sitelinks fetched for {len(sitelinks)} items")
 
-    print("Building embeddings…")
+    base_summaries: Dict[str, Dict[str, str]] = {}
+    if args.catalog_input:
+        base_summaries = load_existing_summaries_from_catalog(args.catalog_input)
+        if base_summaries:
+            log(f"Reusing summaries from {args.catalog_input} for {len(base_summaries)} items")
+        else:
+            log(f"No summaries found at {args.catalog_input}; will fetch from Wikipedia")
+    else:
+        log("No catalog-input provided; fetching summaries from Wikipedia")
+    log("Fetching Wikipedia summaries (multi)…")
+    summaries = fetch_wikipedia_summaries(
+        sitelinks, languages=LABEL_LANGS, exchars=2600, base_summaries=base_summaries
+    )
+
+    catalog_items = build_catalog(rows, labels, sitelinks, summaries)
+    catalog_path = args.out / f"{args.basename}.jsonl"
+    to_jsonl(catalog_items, labels, catalog_path)
+    log(f"Wrote catalog: {catalog_path} ({len(catalog_items)} items)")
+
+    log(f"Building embeddings (model={args.model}, batch={args.batch}, device={args.device})…")
     embeddings = build_embeddings(catalog_items, model_name=args.model, batch_size=args.batch, device=args.device)
-    emb_path = args.out / "embeddings.f32"
+    emb_path = args.out / f"{args.basename}_embeddings.f32"
     save_embeddings(emb_path, embeddings)
-    print(f"Saved embeddings: {emb_path} shape={embeddings.shape}")
+    log(f"Saved embeddings: {emb_path} shape={embeddings.shape}")
 
-    print("Building HNSW index…")
-    index_path = args.out / "hnsw.index"
+    log("Building HNSW index…")
+    index_path = args.out / f"{args.basename}_hnsw.index"
     build_hnsw(index_path, embeddings)
-    print(f"Saved HNSW index: {index_path}")
+    log(f"Saved HNSW index: {index_path}")
 
-    ids_path = args.out / "ids.txt"
+    ids_path = args.out / f"{args.basename}_ids.txt"
     write_ids(ids_path, catalog_items)
 
-    manifest_path = args.out / "manifest.json"
+    manifest_path = args.out / f"{args.basename}_manifest.json"
     write_manifest(
         manifest_path,
         model=args.model,
@@ -370,7 +714,7 @@ def main() -> int:
         index=index_path.name,
         ids=ids_path.name,
     )
-    print(f"Saved manifest: {manifest_path}")
+    log(f"Saved manifest: {manifest_path}")
 
     return 0
 

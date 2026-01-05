@@ -1,4 +1,4 @@
-import { Content, Stream } from '@/types';
+import { Content } from '@/types';
 
 // Lightweight search throttle/cache to avoid hammering MediaWiki
 const SEARCH_MIN_INTERVAL_MS = 8000;
@@ -447,7 +447,8 @@ const fetchEntitiesByIds = async (entityIds: string[], limitLang = 'en|it'): Pro
   const labelMap: Record<string, string> = {};
   const addLabelsToMap = (items: any[]) => {
     items.forEach((e) => {
-      const label = e.labels?.it?.value || e.labels?.en?.value || Object.values(e.labels || {})[0]?.value;
+      const firstLabel = Object.values(e.labels || {})[0] as any;
+      const label = e.labels?.it?.value || e.labels?.en?.value || firstLabel?.value;
       if (label) labelMap[e.id] = label;
     });
   };
@@ -613,7 +614,7 @@ export const getRomanticComedyContent = async (limit = 18): Promise<Content[]> =
   return items.length > 0 ? items : MINIMAL_FALLBACKS;
 };
 
-export const getRecommendations = async (_type: 'movie' | 'tv', anchorId: number | string): Promise<Content[]> => {
+export const getRecommendations = async (_type: 'movie' | 'tv', _anchorId: number | string): Promise<Content[]> => {
   // Temporarily disable heavy related-content queries to avoid timeouts/429s
   return [];
 };
@@ -660,9 +661,6 @@ export const getForYouContent = async (): Promise<Content[]> => {
   const items = shuffle(pool).slice(0, 20);
   return items.length > 0 ? items : MINIMAL_FALLBACKS;
 };
-
-// Live streams are out of scope for Wikidata; return empty
-export const getLiveStreams = async (): Promise<Stream[]> => [];
 
 // Helper to fetch a hero item
 export const getHeroCandidate = async (): Promise<Content | null> => {

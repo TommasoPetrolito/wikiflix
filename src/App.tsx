@@ -6,12 +6,11 @@ import { ContentSquareGrid } from './components/ContentSquareGrid';
 import { PlayerModal } from './components/PlayerModal';
 import { InfoModal } from './components/InfoModal';
 import { SectionSkeleton } from './components/SectionSkeleton';
-import { StreamCard } from './components/StreamCard';
-import { Content, Category, Stream } from './types';
+import { Content, Category } from './types';
 import { addToContinueWatching, getContinueWatching, migrateKnownFixes, getMyList } from './utils/storage';
 import { usePlayerTracking } from './hooks/usePlayerTracking';
 import { useTVNavigation } from './hooks/useTVNavigation';
-import { searchTMDB, getTrendingMovies, getTopRatedMovies, getTopRatedTV, getTop10, getByGenre, getTrendingTV, getRecommendations, getUpcomingMovies, getCriticallyAcclaimed, getHiddenGems, getTrendingToday, getMoviesByActor, findCollectionByMovie, getRecentlyAdded, getForYouContent, getLiveStreams, getRegionalContent, getFemaleDirectedContent, getLGBTContent, getScienceFictionContent, getRomanticComedyContent } from './utils/wikidataAdapter';
+import { searchTMDB, getTrendingMovies, getTopRatedMovies, getTopRatedTV, getTop10, getByGenre, getTrendingTV, getRecommendations, getUpcomingMovies, getCriticallyAcclaimed, getHiddenGems, getTrendingToday, getMoviesByActor, findCollectionByMovie, getRecentlyAdded, getForYouContent, getRegionalContent, getFemaleDirectedContent, getLGBTContent, getScienceFictionContent, getRomanticComedyContent } from './utils/wikidataAdapter';
 import { MoodSelector } from './components/MoodSelector';
 import './App.css';
 
@@ -69,8 +68,6 @@ function App() {
   const [isLoadingTop10, setIsLoadingTop10] = useState(false);
   const [recentlyAdded, setRecentlyAdded] = useState<Content[]>([]);
   const [isLoadingRecentlyAdded, setIsLoadingRecentlyAdded] = useState(false);
-  const [liveSportsStreams, setLiveSportsStreams] = useState<Stream[]>([]);
-  const [isLoadingLiveSports, setIsLoadingLiveSports] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>();
 
   // Run small data migrations on boot (e.g., Sopranos ID fix)
@@ -100,36 +97,6 @@ function App() {
 
     loadTop10();
   }, []);
-
-  // Load live sports streams for home page
-  useEffect(() => {
-    const loadLiveSports = async () => {
-      // Only load on home page
-      if (currentCategory !== 'all' || searchQuery.trim()) {
-        setLiveSportsStreams([]);
-        return;
-      }
-
-      setIsLoadingLiveSports(true);
-      try {
-        const liveStreams = await getLiveStreams();
-        // Limit to first 10 for home page
-        setLiveSportsStreams(liveStreams.slice(0, 10));
-      } catch (error) {
-        // Silently fail - sports API might not be configured
-        console.error('Error loading live sports:', error);
-        setLiveSportsStreams([]);
-      } finally {
-        setIsLoadingLiveSports(false);
-      }
-    };
-
-    loadLiveSports();
-    
-    // Refresh every 60 seconds
-    const interval = setInterval(loadLiveSports, 60000);
-    return () => clearInterval(interval);
-  }, [currentCategory, searchQuery]);
 
   // Load AI-powered "For You" recommendations
   useEffect(() => {
@@ -632,11 +599,6 @@ function App() {
     setInfoContent(content);
   };
 
-  const handlePlayStream = (stream: Stream) => {
-    // Navigate to sports page with the selected stream
-    window.location.href = `/sports?stream=${encodeURIComponent(stream.id)}`;
-  };
-
   const handleShuffle = async () => {
     try {
       // Get a mix of trending content
@@ -737,42 +699,6 @@ function App() {
             <div style={{ fontSize: '1.1rem' }}>No results found for "{searchQuery}"</div>
             <div style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>Try a different search term</div>
           </div>
-        )}
-
-        {/* ===== LIVE SPORTS - Above Top 10 ===== */}
-        {/* Live Sports section - only show when not searching and on 'all' category */}
-        {!searchQuery.trim() && currentCategory === 'all' && (
-          <>
-            {isLoadingLiveSports ? (
-              <SectionSkeleton />
-            ) : liveSportsStreams.length > 0 && (
-              <section className="content-row live-sports-section">
-                <div className="row-header live-sports-header">
-                  <div className="live-sports-title-wrapper">
-                    <div className="live-pulse-indicator">
-                      <span className="pulse-dot"></span>
-                      <span className="pulse-ring"></span>
-                    </div>
-                    <h2 className="row-title">Live Sports</h2>
-                  </div>
-                  <div className="row-badge live-badge">
-                    <span className="live-badge-dot"></span>
-                    <span className="badge-text">{liveSportsStreams.length} LIVE NOW</span>
-                  </div>
-                </div>
-                <div className="content-grid live-sports-grid">
-                  {liveSportsStreams.map((stream) => (
-                    <div key={`live-${stream.id}`} className="grid-item">
-                      <StreamCard
-                        stream={stream}
-                        onClick={handlePlayStream}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-          </>
         )}
 
         {/* ===== RECENTLY EDITED / HIGHLY RANKED / MOST VIEWED ===== */}

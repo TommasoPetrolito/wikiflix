@@ -100,16 +100,6 @@ export const Navbar = ({ currentCategory, onCategoryChange, searchQuery, onSearc
           >
             TV Shows
           </button>
-          <button
-            className={`nav-link ${location.pathname === '/sports' ? 'active' : ''}`}
-            onClick={() => {
-              onCategoryChange('sports');
-              navigate('/sports');
-            }}
-            aria-label="Sports"
-          >
-            Sports
-          </button>
         </div>
 
         <div className="nav-search">

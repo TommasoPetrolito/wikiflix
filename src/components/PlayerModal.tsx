@@ -589,8 +589,6 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
               playsInline
               preload="auto"
               poster={content.backdrop || content.poster}
-              // Avoid forcing CORS; Commons media often lacks ACAO headers
-              referrerPolicy="no-referrer"
               onLoadedData={() => setIsReady(true)}
               onError={() => {
                 setError('Impossibile caricare la sorgente selezionata');

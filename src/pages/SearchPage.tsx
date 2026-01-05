@@ -156,15 +156,15 @@ export default function SearchPage() {
     }
     
     if (typeof yearFrom === 'number') {
-      items = items.filter(i => i.year >= yearFrom);
+      items = items.filter(i => typeof i.year === 'number' && i.year >= yearFrom);
     }
     
     if (typeof yearTo === 'number') {
-      items = items.filter(i => i.year <= yearTo);
+      items = items.filter(i => typeof i.year === 'number' && i.year <= yearTo);
     }
     
     if (sortBy === 'year') {
-      items = [...items].sort((a, b) => b.year - a.year);
+      items = [...items].sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
     } else if (sortBy === 'title') {
       items = [...items].sort((a, b) => a.title.localeCompare(b.title));
     }

@@ -26,7 +26,20 @@ export type LanguageCode =
   | 'id'
   | 'vi'
   | 'th'
-  | 'fa';
+  | 'fa'
+  // EU official languages not already listed
+  | 'bg'
+  | 'hr'
+  | 'da'
+  | 'et'
+  | 'fi'
+  | 'hu'
+  | 'ga'
+  | 'lv'
+  | 'lt'
+  | 'mt'
+  | 'sk'
+  | 'sl';
 
 export type LanguageOption = { code: LanguageCode; label: string; native?: string };
 
@@ -57,6 +70,18 @@ const SUPPORTED_LANGUAGES: LanguageOption[] = [
   { code: 'vi', label: 'Vietnamese' },
   { code: 'th', label: 'Thai' },
   { code: 'fa', label: 'Persian' },
+  { code: 'bg', label: 'Bulgarian' },
+  { code: 'hr', label: 'Croatian' },
+  { code: 'da', label: 'Danish' },
+  { code: 'et', label: 'Estonian' },
+  { code: 'fi', label: 'Finnish' },
+  { code: 'hu', label: 'Hungarian' },
+  { code: 'ga', label: 'Irish' },
+  { code: 'lv', label: 'Latvian' },
+  { code: 'lt', label: 'Lithuanian' },
+  { code: 'mt', label: 'Maltese' },
+  { code: 'sk', label: 'Slovak' },
+  { code: 'sl', label: 'Slovene' },
 ];
 
 const FALLBACK_CHAIN: LanguageCode[] = [
@@ -86,6 +111,18 @@ const FALLBACK_CHAIN: LanguageCode[] = [
   'vi',
   'th',
   'fa',
+  'bg',
+  'hr',
+  'da',
+  'et',
+  'fi',
+  'hu',
+  'ga',
+  'lv',
+  'lt',
+  'mt',
+  'sk',
+  'sl',
 ];
 
 interface LanguageContextValue {
