@@ -6,18 +6,21 @@ export interface Content {
   poster: string;
   backdrop: string;
   description: string;
+  descriptionLong?: string;
   videoUrl?: string;
   subtitles?: string;
   subtitleTracks?: Array<{ src: string; lang?: string; label?: string }>;
   wikidataId?: string;
   commonsLink?: string;
-  altVideos?: Array<{ kind: 'commons' | 'youtube' | 'archive'; url: string; label?: string; lang?: string }>;
+  wikipediaUrl?: string;
+  altVideos?: Array<{ kind: 'commons' | 'youtube' | 'archive' | 'libreflix'; url: string; label?: string; lang?: string }>;
   language?: string;
   license?: string;
   durationSeconds?: number;
   isTrailer?: boolean;
   genres?: string[];
   cast?: string[];
+  directors?: string[];
   season?: number;
   episode?: number;
 }

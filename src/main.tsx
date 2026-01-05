@@ -6,6 +6,7 @@ import SearchPage from './pages/SearchPage.tsx'
 import SportsPage from './pages/SportsPage.tsx'
 import AIPage from './pages/AIPage.tsx'
 import { ThemeProvider } from './contexts/ThemeContext.tsx'
+import { LanguageProvider } from './contexts/LanguageContext.tsx'
 import './index.css'
 
 const router = createBrowserRouter(
@@ -25,9 +26,14 @@ const router = createBrowserRouter(
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ThemeProvider>
-      <RouterProvider router={router} />
-    </ThemeProvider>
+    <LanguageProvider>
+      <ThemeProvider>
+        <RouterProvider
+          router={router}
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        />
+      </ThemeProvider>
+    </LanguageProvider>
   </React.StrictMode>,
 )
 

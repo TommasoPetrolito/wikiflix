@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Category } from '@/types';
 import './Navbar.css';
 import { useSpatialListNavigation } from '@/hooks/useSpatialListNavigation';
+import { LanguageSelector } from '@/components/LanguageSelector';
 
 interface NavbarProps {
   currentCategory: Category;
@@ -27,7 +28,7 @@ export const Navbar = ({ currentCategory, onCategoryChange, searchQuery, onSearc
       setScrolled(window.scrollY > 50);
     };
 
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
@@ -129,7 +130,8 @@ export const Navbar = ({ currentCategory, onCategoryChange, searchQuery, onSearc
           </svg>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.6rem', marginLeft: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.6rem', marginLeft: '0.5rem', alignItems: 'center' }}>
+          <LanguageSelector size="sm" />
           <button
             className="theme-toggle"
             title="Surprise Me"

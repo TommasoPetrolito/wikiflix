@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Content } from '@/types';
+import { useLanguage, getLanguageHostCandidates } from '@/contexts/LanguageContext';
+import { LanguageSelector } from '@/components/LanguageSelector';
 import './PlayerModal.css';
 
 interface PlayerModalProps {
@@ -13,7 +15,19 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
   const [localSubtitleUrl, setLocalSubtitleUrl] = useState<string | null>(null);
   const [localSubtitleLabel, setLocalSubtitleLabel] = useState<string | null>(null);
   const [selectedSourceKey, setSelectedSourceKey] = useState<string | null>(null);
+  const [richDescription, setRichDescription] = useState<string | null>(null);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { preferredLang, fallbacks } = useLanguage();
+
+  const formatExtract = useCallback((text: string | null | undefined) => {
+    if (!text) return '';
+    // Strip Wikipedia-style headings and collapse extra blank lines
+    let out = text.replace(/==+\s*(.*?)\s*==+/g, '$1\n');
+    out = out.replace(/\r/g, '');
+    out = out.replace(/\n{3,}/g, '\n\n');
+    return out.trim();
+  }, []);
 
   const closeOnEsc = useCallback(
     (event: KeyboardEvent) => {
@@ -33,6 +47,8 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
     if (!content) return;
     setError(null);
     setIsReady(false);
+    setRichDescription(null);
+    setIsDescriptionExpanded(false);
     // Reset local subtitles when content changes
     if (localSubtitleUrl) {
       URL.revokeObjectURL(localSubtitleUrl);
@@ -48,6 +64,54 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
       }
     };
   }, [localSubtitleUrl]);
+
+  useEffect(() => {
+    const fetchRichDescription = async () => {
+      if (!content?.wikipediaUrl) return;
+      const existingLen = content.descriptionLong?.length || content.description?.length || 0;
+      if (existingLen > 400) return;
+      try {
+        const url = new URL(content.wikipediaUrl);
+        let titlePath = url.pathname;
+        if (titlePath.startsWith('/wiki/')) titlePath = titlePath.slice('/wiki/'.length);
+        titlePath = decodeURIComponent(titlePath);
+        const baseHost = url.hostname;
+        if (!titlePath) return;
+
+        const hosts = getLanguageHostCandidates(baseHost, preferredLang, fallbacks);
+
+        for (const host of hosts) {
+          const extractUrl = `https://${host}/w/api.php?action=query&format=json&prop=extracts&explaintext=1&exchars=2600&redirects=1&titles=${encodeURIComponent(titlePath)}&origin=*`;
+          const res = await fetch(extractUrl);
+          if (res.ok) {
+            const json = await res.json();
+            const pages = json.query?.pages || {};
+            const firstPage = Object.values(pages)[0] as any;
+            const extract = firstPage?.extract;
+            if (typeof extract === 'string' && extract.trim() && extract.length > existingLen) {
+              setRichDescription(extract.trim());
+              return;
+            }
+          }
+
+          const summaryUrl = `https://${host}/api/rest_v1/page/summary/${encodeURIComponent(titlePath)}`;
+          const res2 = await fetch(summaryUrl);
+          if (res2.ok) {
+            const json2 = await res2.json();
+            const extract2 = json2?.extract;
+            if (typeof extract2 === 'string' && extract2.trim() && extract2.length > existingLen) {
+              setRichDescription(extract2.trim());
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    fetchRichDescription();
+  }, [content, preferredLang, fallbacks]);
 
   const toCommonsFilePath = (url: string) => {
     if (!url) return '';
@@ -139,7 +203,7 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
     label: string;
     url: string;
     embedUrl?: string;
-    kind: 'commons' | 'youtube' | 'archive' | 'direct';
+    kind: 'commons' | 'youtube' | 'archive' | 'direct' | 'libreflix';
     prefersIframe: boolean;
     lang?: string;
   };
@@ -190,6 +254,21 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
         });
         return;
       }
+      if (v.kind === 'libreflix') {
+        const idMatch = v.url.match(/(?:libreflix\.org\/(?:title|video)\/)?([\w-]+)/i);
+        const libreId = idMatch?.[1] || v.url;
+        const embedUrl = libreId ? `https://libreflix.org/embed/${libreId}` : undefined;
+        list.push({
+          key: `alt-${idx}-${v.url}`,
+          label: v.label || 'Libreflix',
+          url: v.url,
+          embedUrl,
+          kind: 'libreflix',
+          prefersIframe: Boolean(embedUrl),
+          lang: v.lang,
+        });
+        return;
+      }
       list.push({
         key: `alt-${idx}-${v.url}`,
         label: v.label || 'Commons',
@@ -235,6 +314,15 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
       ? toCommonsFilePath(selectedSource.url)
       : selectedSource.url
     : '';
+
+  const formatDuration = (seconds?: number) => {
+    if (!seconds || Number.isNaN(seconds)) return undefined;
+    const mins = Math.floor(seconds / 60);
+    const hrs = Math.floor(mins / 60);
+    const remMins = mins % 60;
+    if (hrs > 0) return `${hrs}h ${remMins}m`;
+    return `${mins}m`;
+  };
 
   const iframeSrc = selectedSource?.embedUrl || mediaUrl;
   const isIframeSelected = Boolean(selectedSource && selectedSource.prefersIframe && iframeSrc);
@@ -301,6 +389,9 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
   if (!content) return null;
 
   const videoKey = content.id; // Force remount on content change to reset iframe
+  const displayDescription = richDescription || content.descriptionLong || content.description;
+  const formattedDescription = formatExtract(displayDescription);
+  const shouldClampDescription = (formattedDescription.length || 0) > 420;
 
   return (
     <div className="player-modal-overlay" onClick={onClose}>
@@ -309,7 +400,21 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
         <div className="player-header">
           <div>
             <h2>{content.title}</h2>
-            {content.description && <p className="player-description">{content.description}</p>}
+            {formattedDescription && (
+              <div className="player-description-block">
+                <p className={`player-description long ${shouldClampDescription && !isDescriptionExpanded ? 'collapsed' : ''}`}>
+                  {formattedDescription}
+                </p>
+                {shouldClampDescription && (
+                  <button
+                    className="player-description-toggle"
+                    onClick={() => setIsDescriptionExpanded((v) => !v)}
+                  >
+                    {isDescriptionExpanded ? 'Mostra meno' : 'Mostra altro'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           {!isIframeSelected && (
             <div className="player-actions" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -328,6 +433,38 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
             </div>
           )}
         </div>
+
+        {(content.year || content.language || content.license || content.durationSeconds || content.commonsLink || content.wikidataId || content.wikipediaUrl) && (
+          <div className="player-meta-card">
+            <div className="player-meta-row">
+              {content.year && <span className="player-pill">{content.year}</span>}
+              <span className="player-pill">{content.type === 'movie' ? 'Film' : 'Serie TV'}</span>
+              {(content.genres || []).map((g) => (
+                <span key={g} className="player-pill subtle">{g}</span>
+              ))}
+              {content.durationSeconds && <span className="player-pill">{formatDuration(content.durationSeconds)}</span>}
+              {content.language && <span className="player-pill">Lang: {content.language}</span>}
+              {content.isTrailer && <span className="player-pill">Trailer</span>}
+              {subtitleTracks.length > 0 && <span className="player-pill subtle">{subtitleTracks.length} sub</span>}
+              {sources.length > 1 && <span className="player-pill subtle">{sources.length} fonti</span>}
+              {content.license && <span className="player-pill">Licenza: {content.license}</span>}
+            </div>
+            <div className="player-links-row">
+              {content.commonsLink && (
+                <a href={content.commonsLink} className="player-link" target="_blank" rel="noreferrer">Pagina Commons</a>
+              )}
+              {content.wikidataId && (
+                <a href={`https://www.wikidata.org/wiki/${content.wikidataId}`} className="player-link" target="_blank" rel="noreferrer">Scheda Wikidata</a>
+              )}
+              {content.wikipediaUrl && (
+                <a href={content.wikipediaUrl} className="player-link" target="_blank" rel="noreferrer">Leggi su Wikipedia</a>
+              )}
+              <div className="player-lang-inline">
+                <LanguageSelector size="sm" align="right" label="Lingua preferita" />
+              </div>
+            </div>
+          </div>
+        )}
 
         {languageOptions.length > 1 && (
           <div className="player-language">

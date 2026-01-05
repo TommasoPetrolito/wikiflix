@@ -167,7 +167,7 @@ export const Hero = ({ content, onPlay, onInfo }: HeroProps) => {
 
       <div className={`hero-content ${isContentTransitioning ? 'transitioning' : ''}`}>
         <h1 className="hero-title">{currentContent.title}</h1>
-        <p className="hero-description">{currentContent.description}</p>
+        <p className="hero-description">{currentContent.descriptionLong || currentContent.description}</p>
         <div className="hero-buttons">
           <button 
             className="btn btn-primary" 
@@ -192,9 +192,11 @@ export const Hero = ({ content, onPlay, onInfo }: HeroProps) => {
           </button>
         </div>
         <div className="hero-meta">
-          <span>{currentContent.year}</span>
-          <span className="separator">•</span>
+          {currentContent.year && <span>{currentContent.year}</span>}
+          {currentContent.year && <span className="separator">•</span>}
           <span>{currentContent.type === 'movie' ? 'Movie' : 'TV Series'}</span>
+          {currentContent.isTrailer && <><span className="separator">•</span><span>Trailer</span></>}
+          {currentContent.durationSeconds && <><span className="separator">•</span><span>{Math.max(1, Math.round((currentContent.durationSeconds || 0) / 60))} min</span></>}
           {currentContent.genres?.length ? (
             <>
               <span className="separator">•</span>

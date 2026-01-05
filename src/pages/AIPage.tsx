@@ -100,7 +100,7 @@ export default function AIPage() {
       }
     };
 
-    scrollElement.addEventListener('scroll', handleScroll);
+    scrollElement.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll(); // Initial check
 
     return () => {

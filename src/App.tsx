@@ -4,6 +4,7 @@ import { Hero } from './components/Hero';
 import { ContentGrid } from './components/ContentGrid';
 import { ContentSquareGrid } from './components/ContentSquareGrid';
 import { PlayerModal } from './components/PlayerModal';
+import { InfoModal } from './components/InfoModal';
 import { SectionSkeleton } from './components/SectionSkeleton';
 import { StreamCard } from './components/StreamCard';
 import { Content, Category, Stream } from './types';
@@ -32,6 +33,7 @@ function App() {
   const [currentCategory, setCurrentCategory] = useState<Category>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
+  const [infoContent, setInfoContent] = useState<Content | null>(null);
   const [continueWatching, setContinueWatching] = useState<Content[]>(getContinueWatching());
   const [searchResults, setSearchResults] = useState<Content[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -627,7 +629,7 @@ function App() {
   };
 
   const handleInfo = (content: Content) => {
-    alert(`${content.title}\n\n${content.description}\n\nYear: ${content.year}\nType: ${content.type === 'movie' ? 'Movie' : 'TV Show'}`);
+    setInfoContent(content);
   };
 
   const handlePlayStream = (stream: Stream) => {
@@ -714,6 +716,12 @@ function App() {
           onInfo={(content) => handleInfo(content)}
         />
       )}
+
+      <InfoModal
+        content={infoContent}
+        onClose={() => setInfoContent(null)}
+        onPlay={(c) => handlePlayContent(c)}
+      />
 
       <main className="content">
         {/* Show loading state while searching */}

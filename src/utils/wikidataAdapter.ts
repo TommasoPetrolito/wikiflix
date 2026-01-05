@@ -192,6 +192,7 @@ type WikidataEntity = {
   labels?: Record<string, { value: string }>;
   descriptions?: Record<string, { value: string }>;
   claims?: Record<string, any[]>;
+  sitelinks?: Record<string, { title: string; url?: string }>;
 };
 
 const LANGUAGE_LABELS: Record<string, string> = {
@@ -233,6 +234,56 @@ const extractLanguageFromClaim = (claim: any): string | undefined => {
   return LANGUAGE_LABELS[langId] || langId;
 };
 
+const GENRE_TAG_LABELS: Record<string, string> = {
+  Q130232: 'Documentary',
+  Q2484376: 'Short film',
+  Q291688: 'Animated film',
+  Q277759: 'Silent film',
+  Q192439: 'Film noir',
+  Q859369: 'Science fiction',
+  Q471839: 'Horror',
+  Q319221: 'Thriller',
+  Q157394: 'Comedy',
+  Q200092: 'Action',
+  Q858216: 'Adventure',
+  Q269093: 'Fantasy',
+  Q157443: 'Crime',
+  Q1259759: 'Drama',
+  Q1054574: 'Musical',
+  Q1091100: 'Family',
+  Q824186: 'Black-and-white',
+  Q3957: 'Biographical',
+  Q25379: 'Television film',
+  Q21191270: 'Web series',
+};
+
+const mapGenreTags = (genreIds: string[]): string[] => {
+  const tags: string[] = [];
+  genreIds.forEach((id) => {
+    const label = GENRE_TAG_LABELS[id];
+    if (label) tags.push(label);
+  });
+  const seen = new Set<string>();
+  return tags.filter((t) => {
+    if (seen.has(t)) return false;
+    seen.add(t);
+    return true;
+  });
+};
+
+const parseDurationSeconds = (claim: any): number | undefined => {
+  const val = claim?.mainsnak?.datavalue?.value;
+  if (!val) return undefined;
+  const amount = val.amount ? Number(val.amount) : undefined;
+  if (amount === undefined || Number.isNaN(amount)) return undefined;
+  const unit: string | undefined = val.unit;
+  // Wikidata units: Q11574 second, Q7727 minute, Q25235 hour
+  if (unit?.endsWith('Q7727')) return amount * 60;
+  if (unit?.endsWith('Q25235')) return amount * 3600;
+  // default assumes seconds (Q11574) or unitless already in seconds
+  return amount;
+};
+
 const mapEntityToContent = (entity: WikidataEntity): Content | null => {
   const title = entity.labels?.en?.value || entity.labels?.it?.value;
   if (!title) return null;
@@ -263,7 +314,16 @@ const mapEntityToContent = (entity: WikidataEntity): Content | null => {
   const youtubeIds = collectClaimValues(claims.P1651);
   const archiveIds = collectClaimValues(claims.P724);
   const licenseClaim = extractClaimValue(claims.P275?.[0]);
-  const durationClaim = extractClaimValue(claims.P2047?.[0]);
+  const durationClaim = parseDurationSeconds(claims.P2047?.[0]);
+  const genreIds = collectClaimValues(claims.P136);
+
+  const enWiki = entity.sitelinks?.enwiki?.title;
+  const itWiki = entity.sitelinks?.itwiki?.title;
+  const wikipediaUrl = enWiki
+    ? `https://en.wikipedia.org/wiki/${encodeURIComponent(enWiki)}`
+    : itWiki
+      ? `https://it.wikipedia.org/wiki/${encodeURIComponent(itWiki)}`
+      : undefined;
 
   // Skip non-media (no video)
   if (!videoClaims.length) return null;
@@ -281,7 +341,7 @@ const mapEntityToContent = (entity: WikidataEntity): Content | null => {
       : undefined);
 
   const isTrailer = /trailer/i.test(title) || videoClaims.some((v) => /trailer/i.test(v.url));
-  const durationSeconds = durationClaim && !Number.isNaN(Number(durationClaim)) ? Number(durationClaim) : undefined;
+  const durationSeconds = durationClaim;
 
   return {
     id: entity.id,
@@ -292,16 +352,18 @@ const mapEntityToContent = (entity: WikidataEntity): Content | null => {
     poster: toCommonsFilePath(imageClaim) || FALLBACK_POSTER,
     backdrop: toCommonsFilePath(imageClaim) || FALLBACK_BACKDROP,
     description: desc || 'Result from Wikidata',
+    descriptionLong: desc || 'Result from Wikidata',
     videoUrl: primaryVideo?.url || '',
     language: primaryVideo?.lang,
     subtitles: subtitleTracks[0]?.src,
     subtitleTracks: subtitleTracks.length ? subtitleTracks : undefined,
     altVideos: altVideos.length ? altVideos : undefined,
     commonsLink,
+    wikipediaUrl,
     license: licenseClaim,
     durationSeconds,
     isTrailer,
-    genres: undefined,
+    genres: mapGenreTags(genreIds),
     cast: undefined,
   };
 };
@@ -331,14 +393,7 @@ const searchViaMediaWiki = async (query: string, limit = 4): Promise<Content[]> 
 
     if (entityIds.length === 0) return [];
 
-    const detailUrl = `${WIKIDATA_API}?action=wbgetentities&format=json&languages=en|it&props=labels|descriptions|claims|sitelinks&origin=*&ids=${entityIds.join('|')}`;
-    const detailRes = await fetch(detailUrl);
-    if (!detailRes.ok) throw new Error(`wbgetentities ${detailRes.status}`);
-    const detailJson = await detailRes.json();
-    const entities: WikidataEntity[] = Object.values(detailJson.entities || {});
-    const mapped = entities.map(mapEntityToContent).filter((c): c is Content => Boolean(c));
-    // Keep only items with a videoUrl after mapping to avoid non-film results
-    const withVideo = mapped.filter((c) => c.videoUrl && c.videoUrl.trim());
+    const withVideo = await fetchEntitiesByIds(entityIds);
     return withVideo;
   } catch (err) {
     console.error('mediawiki search failed', err);
@@ -361,6 +416,17 @@ const dedupeContent = (items: Content[]): Content[] => {
     out.push(item);
   }
   return out;
+};
+
+const fetchEntitiesByIds = async (entityIds: string[], limitLang = 'en|it'): Promise<Content[]> => {
+  if (entityIds.length === 0) return [];
+  const detailUrl = `${WIKIDATA_API}?action=wbgetentities&format=json&languages=${limitLang}&props=labels|descriptions|claims|sitelinks&origin=*&ids=${entityIds.join('|')}`;
+  const detailRes = await fetch(detailUrl);
+  if (!detailRes.ok) throw new Error(`wbgetentities ${detailRes.status}`);
+  const detailJson = await detailRes.json();
+  const entities: WikidataEntity[] = Object.values(detailJson.entities || {});
+  const mapped = entities.map(mapEntityToContent).filter((c): c is Content => Boolean(c));
+  return mapped.filter((c) => c.videoUrl && c.videoUrl.trim());
 };
 
 const shuffle = <T>(arr: T[]): T[] => {

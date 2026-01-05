@@ -254,6 +254,9 @@
   position: relative;
   overflow: hidden;
   letter-spacing: 0.25px;
+  white-space: pre-line;
+  max-height: 10rem;
+  overflow: hidden;
   outline: none;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -359,6 +362,7 @@
   font-size: 0.78rem;
   color: rgba(255, 255, 255, 0.7);
   font-weight: 500;
+  flex-wrap: wrap;
 }
 
 .hero-meta span {
