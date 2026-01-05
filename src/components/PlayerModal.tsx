@@ -141,6 +141,7 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
     embedUrl?: string;
     kind: 'commons' | 'youtube' | 'archive' | 'direct';
     prefersIframe: boolean;
+    lang?: string;
   };
 
   const sources = useMemo<SourceOption[]>(() => {
@@ -156,6 +157,7 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
         url: baseUrl,
         kind,
         prefersIframe: false,
+        lang: content.language,
       });
     }
 
@@ -170,6 +172,7 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
           embedUrl,
           kind: 'youtube',
           prefersIframe: Boolean(embedUrl),
+          lang: v.lang,
         });
         return;
       }
@@ -183,6 +186,7 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
           embedUrl,
           kind: 'archive',
           prefersIframe: Boolean(embedUrl),
+          lang: v.lang,
         });
         return;
       }
@@ -192,6 +196,7 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
         url: toCommonsFilePath(v.url),
         kind: 'commons',
         prefersIframe: false,
+        lang: v.lang,
       });
     });
 
@@ -210,6 +215,20 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
   }, [content?.id, sources]);
 
   const selectedSource = sources.find((s) => s.key === selectedSourceKey) || sources[0];
+
+  const languageOptions = useMemo(() => {
+    const langs = sources.map((s) => s.lang).filter(Boolean) as string[];
+    return Array.from(new Set(langs));
+  }, [sources]);
+
+  const handleLanguageSelect = (lang: string) => {
+    const match = sources.find((s) => s.lang === lang) || sources.find((s) => !s.lang);
+    if (match) {
+      setSelectedSourceKey(match.key);
+      setError(null);
+      setIsReady(false);
+    }
+  };
 
   const mediaUrl = selectedSource
     ? selectedSource.kind === 'commons' || selectedSource.kind === 'direct'
@@ -251,11 +270,20 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
   }
 
   const subtitleTracks: Array<{ src: string; lang?: string; label: string }> = [];
-  if (content?.subtitles) {
-    subtitleTracks.push({ src: toCommonsFilePath(content.subtitles), lang: 'en', label: 'Subtitles' });
+  const addTrack = (src?: string, label?: string, lang?: string) => {
+    if (!src) return;
+    const normalized = /^blob:|^data:/i.test(src) ? src : toCommonsFilePath(src);
+    if (!normalized) return;
+    if (subtitleTracks.some((t) => t.src === normalized)) return;
+    subtitleTracks.push({ src: normalized, lang, label: label || lang || 'Subtitles' });
+  };
+
+  (content?.subtitleTracks || []).forEach((t) => addTrack(t.src, t.label, t.lang));
+  if (content?.subtitles && subtitleTracks.length === 0) {
+    addTrack(content.subtitles, 'Subtitles');
   }
   if (localSubtitleUrl) {
-    subtitleTracks.push({ src: localSubtitleUrl, lang: 'en', label: localSubtitleLabel || 'Local subtitles' });
+    addTrack(localSubtitleUrl, localSubtitleLabel || 'Local subtitles', 'en');
   }
 
   const handleUploadClick = () => fileInputRef.current?.click();
@@ -301,6 +329,24 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
           )}
         </div>
 
+        {languageOptions.length > 1 && (
+          <div className="player-language">
+            <label htmlFor="language-select" className="player-language-label">Lingua:</label>
+            <select
+              id="language-select"
+              className="player-language-select"
+              value={selectedSource?.lang || languageOptions[0]}
+              onChange={(e) => handleLanguageSelect(e.target.value)}
+            >
+              {languageOptions.map((lang) => (
+                <option key={lang} value={lang}>
+                  {lang}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {sources.length > 1 && (
           <div className="player-sources">
             <span className="player-sources-label">Sorgenti:</span>
@@ -314,7 +360,7 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
                   setIsReady(false);
                 }}
               >
-                {s.label}
+                {s.lang ? `${s.label} · ${s.lang}` : s.label}
               </button>
             ))}
           </div>

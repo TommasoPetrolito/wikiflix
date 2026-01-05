@@ -194,6 +194,19 @@ type WikidataEntity = {
   claims?: Record<string, any[]>;
 };
 
+const LANGUAGE_LABELS: Record<string, string> = {
+  Q1860: 'English',
+  Q652: 'Italian',
+  Q150: 'French',
+  Q1321: 'Spanish',
+  Q188: 'German',
+  Q5146: 'Portuguese',
+  Q5287: 'Japanese',
+  Q7850: 'Chinese',
+  Q7737: 'Polish',
+  Q18813: 'Russian',
+};
+
 const extractClaimValue = (snak: any): string | undefined => {
   const val = snak?.mainsnak?.datavalue?.value;
   if (!val) return undefined;
@@ -212,15 +225,39 @@ const collectClaimValues = (claims: any[] | undefined): string[] => {
     .filter((v): v is string => Boolean(v));
 };
 
+const extractLanguageFromClaim = (claim: any): string | undefined => {
+  const qual = claim?.qualifiers;
+  const langClaim = qual?.P407?.[0] || qual?.P364?.[0];
+  const langId = extractClaimValue(langClaim);
+  if (!langId) return undefined;
+  return LANGUAGE_LABELS[langId] || langId;
+};
+
 const mapEntityToContent = (entity: WikidataEntity): Content | null => {
   const title = entity.labels?.en?.value || entity.labels?.it?.value;
   if (!title) return null;
 
   const desc = entity.descriptions?.it?.value || entity.descriptions?.en?.value;
   const claims = entity.claims || {};
-  const videoClaims = collectClaimValues(claims.P10);
+  const rawVideos = (claims.P10 || []).map((c: any) => ({
+    url: extractClaimValue(c),
+    lang: extractLanguageFromClaim(c),
+  }));
+  const videoClaims = rawVideos
+    .map((v) => ({ url: v.url ? toCommonsFilePath(v.url) : '', lang: v.lang }))
+    .filter((v) => Boolean(v.url));
   const imageClaim = extractClaimValue(claims.P18?.[0]);
-  const subtitleClaim = extractClaimValue(claims.P1173?.[0]);
+  const rawSubtitles = (claims.P1173 || []).map((c: any) => ({
+    url: extractClaimValue(c),
+    lang: extractLanguageFromClaim(c),
+  }));
+  const subtitleTracks = rawSubtitles
+    .map((s) => ({
+      src: s.url ? toCommonsFilePath(String(s.url)) : '',
+      lang: s.lang,
+      label: s.lang ? `Subtitles (${s.lang})` : 'Subtitles',
+    }))
+    .filter((s) => Boolean(s.src));
   const dateClaim = extractClaimValue(claims.P577?.[0]);
   const year = dateClaim && typeof dateClaim === 'string' ? Number(dateClaim.slice(0, 4)) : undefined;
   const youtubeIds = collectClaimValues(claims.P1651);
@@ -231,11 +268,10 @@ const mapEntityToContent = (entity: WikidataEntity): Content | null => {
   // Skip non-media (no video)
   if (!videoClaims.length) return null;
 
-  const commonsVideos = videoClaims.map(toCommonsFilePath).filter(Boolean);
-  const primaryVideo = commonsVideos[0];
+  const primaryVideo = videoClaims[0];
 
-  const altVideos: Array<{ kind: 'commons' | 'youtube' | 'archive'; url: string; label?: string }> = [];
-  commonsVideos.slice(1).forEach((u) => altVideos.push({ kind: 'commons', url: u }));
+  const altVideos: Array<{ kind: 'commons' | 'youtube' | 'archive'; url: string; label?: string; lang?: string }> = [];
+  videoClaims.slice(1).forEach((v) => altVideos.push({ kind: 'commons', url: v.url, label: v.lang ? `${v.lang}` : undefined, lang: v.lang }));
   youtubeIds.forEach((id) => altVideos.push({ kind: 'youtube', url: `https://www.youtube.com/watch?v=${id}`, label: 'YouTube' }));
   archiveIds.forEach((id) => altVideos.push({ kind: 'archive', url: `https://archive.org/details/${id}`, label: 'Internet Archive' }));
 
@@ -244,7 +280,7 @@ const mapEntityToContent = (entity: WikidataEntity): Content | null => {
       ? `https://commons.wikimedia.org/wiki/${encodeURIComponent(entity.sitelinks.commonswiki.title)}`
       : undefined);
 
-  const isTrailer = /trailer/i.test(title) || videoClaims.some((v) => /trailer/i.test(v));
+  const isTrailer = /trailer/i.test(title) || videoClaims.some((v) => /trailer/i.test(v.url));
   const durationSeconds = durationClaim && !Number.isNaN(Number(durationClaim)) ? Number(durationClaim) : undefined;
 
   return {
@@ -256,8 +292,10 @@ const mapEntityToContent = (entity: WikidataEntity): Content | null => {
     poster: toCommonsFilePath(imageClaim) || FALLBACK_POSTER,
     backdrop: toCommonsFilePath(imageClaim) || FALLBACK_BACKDROP,
     description: desc || 'Result from Wikidata',
-    videoUrl: primaryVideo || '',
-    subtitles: subtitleClaim ? toCommonsFilePath(String(subtitleClaim)) : undefined,
+    videoUrl: primaryVideo?.url || '',
+    language: primaryVideo?.lang,
+    subtitles: subtitleTracks[0]?.src,
+    subtitleTracks: subtitleTracks.length ? subtitleTracks : undefined,
     altVideos: altVideos.length ? altVideos : undefined,
     commonsLink,
     license: licenseClaim,

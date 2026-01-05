@@ -8,9 +8,11 @@ export interface Content {
   description: string;
   videoUrl?: string;
   subtitles?: string;
+  subtitleTracks?: Array<{ src: string; lang?: string; label?: string }>;
   wikidataId?: string;
   commonsLink?: string;
-  altVideos?: Array<{ kind: 'commons' | 'youtube' | 'archive'; url: string; label?: string }>;
+  altVideos?: Array<{ kind: 'commons' | 'youtube' | 'archive'; url: string; label?: string; lang?: string }>;
+  language?: string;
   license?: string;
   durationSeconds?: number;
   isTrailer?: boolean;
