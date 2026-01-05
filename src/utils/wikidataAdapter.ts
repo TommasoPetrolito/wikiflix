@@ -198,6 +198,7 @@ const mapEntityToContent = (entity: WikidataEntity): Content | null => {
   const claims = entity.claims || {};
   const videoClaim = extractClaimValue(claims.P10);
   const imageClaim = extractClaimValue(claims.P18);
+  const subtitleClaim = extractClaimValue(claims.P1173);
   const dateClaim = extractClaimValue(claims.P577);
   const year = dateClaim && typeof dateClaim === 'string' ? Number(dateClaim.slice(0, 4)) : undefined;
 
@@ -213,7 +214,7 @@ const mapEntityToContent = (entity: WikidataEntity): Content | null => {
     backdrop: toCommonsFilePath(imageClaim) || FALLBACK_BACKDROP,
     description: desc || 'Result from Wikidata',
     videoUrl: toCommonsFilePath(videoClaim) || '',
-    subtitles: undefined,
+    subtitles: subtitleClaim ? toCommonsFilePath(String(subtitleClaim)) : undefined,
     genres: undefined,
     cast: undefined,
   };

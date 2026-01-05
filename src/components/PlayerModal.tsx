@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { Content } from '@/types';
 import './PlayerModal.css';
 
@@ -12,6 +12,9 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [useHtml5, setUseHtml5] = useState(true);
+  const [localSubtitleUrl, setLocalSubtitleUrl] = useState<string | null>(null);
+  const [localSubtitleLabel, setLocalSubtitleLabel] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const closeOnEsc = useCallback(
     (event: KeyboardEvent) => {
@@ -32,7 +35,21 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
     setError(null);
     setIsReady(false);
     setUseHtml5(true);
+    // Reset local subtitles when content changes
+    if (localSubtitleUrl) {
+      URL.revokeObjectURL(localSubtitleUrl);
+      setLocalSubtitleUrl(null);
+      setLocalSubtitleLabel(null);
+    }
   }, [content]);
+
+  useEffect(() => {
+    return () => {
+      if (localSubtitleUrl) {
+        URL.revokeObjectURL(localSubtitleUrl);
+      }
+    };
+  }, [localSubtitleUrl]);
 
   const toCommonsFilePath = (url: string) => {
     if (!url) return '';
@@ -102,6 +119,26 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
   maybeAddWebmVariant(videoSource);
   maybeAddWebmVariant(filePathSource);
 
+  const subtitleTracks: Array<{ src: string; lang?: string; label: string }> = [];
+  if (content?.subtitles) {
+    subtitleTracks.push({ src: toCommonsFilePath(content.subtitles), lang: 'en', label: 'Subtitles' });
+  }
+  if (localSubtitleUrl) {
+    subtitleTracks.push({ src: localSubtitleUrl, lang: 'en', label: localSubtitleLabel || 'Local subtitles' });
+  }
+
+  const handleUploadClick = () => fileInputRef.current?.click();
+
+  const handleSubtitleFile = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    // Simple VTT only; user-provided
+    const url = URL.createObjectURL(file);
+    if (localSubtitleUrl) URL.revokeObjectURL(localSubtitleUrl);
+    setLocalSubtitleUrl(url);
+    setLocalSubtitleLabel(file.name);
+  };
+
   if (!content) return null;
 
   const videoKey = content.id; // Force remount on content change to reset iframe
@@ -115,7 +152,20 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
             <h2>{content.title}</h2>
             {content.description && <p className="player-description">{content.description}</p>}
           </div>
-          {isReady && <span className="player-progress">Player pronto</span>}
+          <div className="player-actions" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <button className="secondary-button" onClick={handleUploadClick} style={{ padding: '0.35rem 0.65rem' }}>
+              Carica sottotitoli (.vtt)
+            </button>
+            <input
+              type="file"
+              accept=".vtt,text/vtt"
+              ref={fileInputRef}
+              style={{ display: 'none' }}
+              onChange={handleSubtitleFile}
+            />
+            {localSubtitleLabel && <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>Usando: {localSubtitleLabel}</span>}
+            {isReady && <span className="player-progress">Player pronto</span>}
+          </div>
         </div>
 
         {videoSource ? (
@@ -140,6 +190,9 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
             )}
             {derivedSources.map((s, idx) => (
               <source key={idx} src={s.src} type={s.type} />
+            ))}
+            {subtitleTracks.map((t, idx) => (
+              <track key={`sub-${idx}-${t.src}`} kind="subtitles" src={t.src} srcLang={t.lang} label={t.label} default={idx === 0} />
             ))}
           </video>
         ) : (
