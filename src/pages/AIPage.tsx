@@ -162,6 +162,11 @@ export default function AIPage() {
     if (facets.has('family')) {
       cirrusQueries.push(`${userQuery} animated film`);
       cirrusQueries.push(`${userQuery} cartoon film`);
+      cirrusQueries.push('big buck bunny');
+      cirrusQueries.push('mickey mouse cartoon');
+      cirrusQueries.push('open source film');
+      cirrusQueries.push('blender open movie');
+      cirrusQueries.push('public domain animated film');
     }
 
     if (facets.has('classic')) {
@@ -176,7 +181,7 @@ export default function AIPage() {
     if (facets.has('femaleDirector')) cirrusQueries.push(`${userQuery} female director film trailer`);
 
     // Default guard: if no facets, still keep 2 queries max
-    const uniqCirrus = Array.from(new Set(cirrusQueries)).slice(0, 3);
+    const uniqCirrus = Array.from(new Set(cirrusQueries)).slice(0, 5);
 
     return { bucketCalls, cirrusQueries: uniqCirrus, labels, raw };
   };
