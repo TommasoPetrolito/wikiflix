@@ -13,7 +13,33 @@ action=query&list=search&srsearch="<query> haswbstatement:P10 haswbstatement:P31
 → ids → wbgetentities (labels, descriptions, claims P10/P18/P1173/P577)
 ```
 
-## 2. Sistema di Cache Locale (Client-Side)
+## 2. Build offline del catalogo (GitHub Action)
+
+Pipeline proposta (client-side only, nessun backend):
+
+1) In CI: esegui `tools/build_catalog.py` che:
+  - Lancia la SPARQL (vedi query sotto) sull'endpoint Wikidata e salva i binding.
+  - Recupera le label dei Q-id con `wbgetentities` (registi, paesi, generi, licenze, lingue).
+  - Normalizza le fonti video (Commons P10 → Special:FilePath, YouTube P1651 → watch, Vimeo P4015, Libreflix P6614 → /assistir/, IA P724 → details).
+  - Scrive `data/catalog/catalog.jsonl` con i campi tipo `Content` (title, descrizioni, year, poster, altVideos, directors, countries, genres…).
+  - Calcola embedding multilingua (default `intfloat/multilingual-e5-small`), salva `embeddings.f32` e un indice ANN HNSW `hnsw.index`, più `ids.txt` e `manifest.json`.
+
+2) Deploy: pubblica gli artifact statici (catalog.jsonl, embeddings.f32, hnsw.index, ids.txt, manifest.json) insieme all'app. Il client li carica e usa:
+  - FTS client-side per testo (MiniSearch/lunr) sul catalogo.
+  - ANN (HNSW) per semantica, con embedding query generati client-side (stesso modello quantizzato) o precalcolati serverless.
+
+3) Runtime: filtri strutturati sul catalogo in memoria; fusion dei risultati FTS/ANN (es. RRF) e rendering dai metadati locali. Nessuna chiamata live a Wikidata/Wikipedia per la ricerca.
+
+Comandi utili (CI):
+```
+python tools/build_catalog.py --out data/catalog \
+  --model intfloat/multilingual-e5-small \
+  --device cpu
+```
+
+Dipendenze: `pip install -r tools/requirements.txt` (requests, numpy, hnswlib, sentence-transformers, tqdm).
+
+## 3. Sistema di Cache Locale (Client-Side)
 
 Mappatura dei dati salvata in `localStorage` per evitare chiamate ripetitive.
 
@@ -49,3 +75,76 @@ Mappatura dei dati salvata in `localStorage` per evitare chiamate ripetitive.
 - Fallback: Inglese.
 
 ```
+```
+SELECT 
+  ?item ?itemLabel ?itemDescription ?year 
+  ?directorID ?image 
+  ?commonsVideo ?youtubeID ?vimeoID ?libreflixID ?iaID 
+  ?instanceIDs ?genreIDs ?licenseIDs ?languageIDs ?countryIDs
+WHERE {
+  {
+    SELECT ?item 
+           (SAMPLE(YEAR(?pubDate)) AS ?year)
+           (SAMPLE(?poster) AS ?image)
+           (SAMPLE(?commons) AS ?commonsVideo) 
+           (SAMPLE(?youtube) AS ?youtubeID) 
+           (SAMPLE(?vimeo) AS ?vimeoID) 
+           (SAMPLE(?libreflix) AS ?libreflixID) 
+           (SAMPLE(?ia) AS ?iaID)
+           (SAMPLE(?dir) AS ?directorID)
+           (GROUP_CONCAT(DISTINCT ?instanceOf; separator=",") AS ?instanceIDs)
+           (GROUP_CONCAT(DISTINCT ?genre; separator=",") AS ?genreIDs)
+           (GROUP_CONCAT(DISTINCT ?license; separator=",") AS ?licenseIDs)
+           (GROUP_CONCAT(DISTINCT ?language; separator=",") AS ?languageIDs)
+           (GROUP_CONCAT(DISTINCT ?country; separator=",") AS ?countryIDs)
+    WHERE {
+      # 1. Base: Film
+      ?item wdt:P31/wdt:P279* wd:Q11424 .
+      
+      # 2. Filtro Ibrido Legale (Sempre necessario alla base)
+      {
+        { ?item wdt:P6216 wd:Q19652 . } UNION 
+        { ?item wdt:P10 ?commons . } UNION 
+        { ?item wdt:P577 ?pubDate . FILTER(YEAR(?pubDate) < 1926) }
+      }
+      
+      # 3. Almeno una fonte video
+      {
+        { ?item wdt:P10 ?commons . } UNION 
+        { ?item wdt:P1651 ?youtube . } UNION 
+        { ?item wdt:P4015 ?vimeo . } UNION 
+        { ?item wdt:P6614 ?libreflix . } UNION 
+        { ?item wdt:P724 ?ia . }
+      }
+
+      # 4. Estrazione ID puri (P*)
+      OPTIONAL { ?item wdt:P31 ?instanceOf . }
+      OPTIONAL { ?item wdt:P136 ?genre . }
+      OPTIONAL { ?item wdt:P275 ?license . }
+      OPTIONAL { ?item wdt:P364 ?language . }
+      OPTIONAL { ?item wdt:P495 ?country . }
+      OPTIONAL { ?item wdt:P57 ?dir . }
+      OPTIONAL { ?item wdt:P18 ?poster . }
+      OPTIONAL { ?item wdt:P577 ?pubDate . }
+
+      # 5. Esclusioni rapide
+      MINUS { ?item wdt:P31 wd:Q97570383 } # No glass positives
+      MINUS { ?item p:P10/pq:P3831 wd:Q622550 } # No trailer
+    } 
+    GROUP BY ?item
+  }
+  
+  # 6. Label Service (Solo per itemLabel e itemDescription)
+  # Usiamo il fallback di lingue che hai scelto
+  SERVICE wikibase:label { 
+    bd:serviceParam wikibase:language "en,fr,de,es,pt,it,nl,da,sv,no,sl,sk,cz,bg,hu,po,pl,ru". 
+  }
+}
+ORDER BY ?item
+
+```
+
+Script: `tools/build_catalog.py`
+- Output (default `data/catalog/`): `catalog.jsonl`, `embeddings.f32`, `hnsw.index`, `ids.txt`, `manifest.json`.
+- Modello embedding default: `intfloat/multilingual-e5-small` (multilingua, 384-dim).
+- Norme URL: Commons → Special:FilePath, YouTube → watch, Vimeo → vimeo.com/{id}, Libreflix → /assistir/{slug}, IA → archive.org/details/{id}.
