@@ -1,7 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Content, Category } from '@/types';
-import { searchTMDB } from '@/utils/wikidataAdapter';
+import {
+  searchTMDB,
+  getScienceFictionContent,
+  getRomanticComedyContent,
+  getLGBTContent,
+  getFemaleDirectedContent,
+  getByGenre,
+  getRegionalContent,
+  getHiddenGems,
+} from '@/utils/wikidataAdapter';
 import { ContentCard } from '@/components/ContentCard';
 import { PlayerModal } from '@/components/PlayerModal';
 import { Navbar } from '@/components/Navbar';
@@ -13,6 +22,28 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
 }
+
+type Facet = 'sciFi' | 'horror' | 'thriller' | 'comedy' | 'romcom' | 'family' | 'documentary' | 'lgbt' | 'femaleDirector' | 'classic' | 'region-es' | 'region-it' | 'region-de' | 'region-uk' | 'region-br' | 'region-ca' | 'region-au';
+
+const KEYWORD_MAP: Record<Facet, string[]> = {
+  sciFi: ['sci-fi', 'science fiction', 'space', 'space opera'],
+  horror: ['horror', 'scary', 'haunted'],
+  thriller: ['thriller', 'noir', 'mystery', 'suspense'],
+  comedy: ['comedy', 'funny', 'humor'],
+  romcom: ['romcom', 'rom-com', 'romantic comedy'],
+  family: ['family', 'kids', 'children', 'animated', 'animation', 'cartoon', 'cartoons', 'cartoni', 'cartoni animati', 'animazione'],
+  documentary: ['documentary', 'docu', 'doc'],
+  lgbt: ['lgbt', 'queer', 'gay', 'lesbian'],
+  femaleDirector: ['female director', 'woman director', 'women director', 'directed by woman'],
+  classic: ['silent', 'classic', '1920s', '1930s', '1940s', '1950s'],
+  'region-es': ['spanish', 'spain', 'latin'],
+  'region-it': ['italian', 'italy', 'italiano'],
+  'region-de': ['german', 'germany', 'deutsch'],
+  'region-uk': ['british', 'uk', 'england', 'english'],
+  'region-br': ['brazil', 'brazilian', 'portuguese'],
+  'region-ca': ['canada', 'canadian'],
+  'region-au': ['australia', 'australian'],
+};
 
 export default function AIPage() {
   const navigate = useNavigate();
@@ -81,58 +112,73 @@ export default function AIPage() {
   useSpatialListNavigation(recGridRef as any, { itemSelector: '.content-card' });
   useSpatialListNavigation(suggGridRef as any, { itemSelector: '.suggestion-chip' });
 
-  const getAIRecommendations = (userQuery: string): { message: string; searchQueries: string[] } => {
-    // Improved keyword-based recommendations with specific movie/show titles
-    const query = userQuery.toLowerCase();
-    const searchQueries: string[] = [];
-    
-    // Generate specific search queries based on keywords
-    if (query.includes('plot twist') || query.includes('twist')) {
-      searchQueries.push('The Sixth Sense', 'Shutter Island', 'Fight Club', 'Inception');
-    } else if (query.includes('tv show') || query.includes('series') || query.includes('season')) {
-      searchQueries.push('Breaking Bad', 'Game of Thrones', 'Stranger Things', 'The Office');
-    } else if (query.includes('action') && query.includes('female')) {
-      searchQueries.push('Atomic Blonde', 'Mad Max Fury Road', 'Wonder Woman');
-    } else if (query.includes('action')) {
-      searchQueries.push('John Wick', 'The Dark Knight', 'Mission Impossible');
-    } else if (query.includes('comedy') || query.includes('funny')) {
-      searchQueries.push('Superbad', 'The Hangover', '21 Jump Street', 'Step Brothers');
-    } else if (query.includes('romantic') && query.includes('2000')) {
-      searchQueries.push('The Notebook', '500 Days of Summer', 'Love Actually');
-    } else if (query.includes('horror') || query.includes('scary')) {
-      searchQueries.push('The Conjuring', 'Get Out', 'A Quiet Place', 'Hereditary');
-    } else if (query.includes('psychological') || query.includes('mind')) {
-      searchQueries.push('Black Swan', 'Gone Girl', 'Prisoners', 'Shutter Island');
-    } else if (query.includes('romance') || query.includes('romantic')) {
-      searchQueries.push('The Notebook', 'Pride and Prejudice', 'La La Land');
-    } else if (query.includes('sci-fi') || query.includes('science fiction') || query.includes('space')) {
-      searchQueries.push('Interstellar', 'Arrival', 'Blade Runner', 'The Martian');
-    } else if (query.includes('drama')) {
-      searchQueries.push('The Shawshank Redemption', 'Forrest Gump', 'Good Will Hunting');
-    } else if (query.includes('family') || query.includes('kids') || query.includes('feel good')) {
-      searchQueries.push('Toy Story', 'The Lion King', 'Finding Nemo', 'Up');
-    } else if (query.includes('thriller')) {
-      searchQueries.push('Se7en', 'The Silence of the Lambs', 'Gone Girl');
-    } else if (query.includes('breaking bad')) {
-      searchQueries.push('Breaking Bad', 'Better Call Saul', 'Ozark', 'Narcos');
-    } else if (query.includes('anime')) {
-      searchQueries.push('Attack on Titan', 'Death Note', 'Demon Slayer');
-    } else {
-      // Default: search for specific popular titles + the query
-      searchQueries.push(userQuery, 'Inception', 'The Dark Knight');
-    }
-    
-    // Ensure we have at least 2 queries and limit to 3
-    if (searchQueries.length === 1) {
-      searchQueries.push(userQuery);
-    }
-    
-    console.log('Search queries:', searchQueries);
-    
-    return {
-      message: `Here are some recommendations based on what you're looking for!`,
-      searchQueries: searchQueries.slice(0, 3),
+  const matchFacets = (userQuery: string): { facets: Set<Facet>; decades: string[]; raw: string } => {
+    const q = userQuery.toLowerCase();
+    const facets = new Set<Facet>();
+    Object.entries(KEYWORD_MAP).forEach(([facet, words]) => {
+      if (words.some(w => q.includes(w))) facets.add(facet as Facet);
+    });
+    const decades: string[] = [];
+    const decadeMatch = q.match(/(19[2-5]0)s/);
+    if (decadeMatch) decades.push(decadeMatch[1]);
+    return { facets, decades, raw: q };
+  };
+
+  const buildSearchPlan = (userQuery: string) => {
+    const { facets, decades, raw } = matchFacets(userQuery);
+
+    const bucketCalls: Array<() => Promise<Content[]>> = [];
+    const cirrusQueries: string[] = [];
+    const labels: string[] = [];
+
+    const addBucket = (fn: () => Promise<Content[]>, label: string) => {
+      bucketCalls.push(fn);
+      labels.push(label);
     };
+
+    if (facets.has('sciFi')) addBucket(() => getScienceFictionContent(18), 'science fiction');
+    if (facets.has('horror') || facets.has('thriller')) addBucket(() => getByGenre('movie', 27, 24), 'horror/thriller');
+    if (facets.has('comedy')) addBucket(() => getByGenre('movie', 35, 24), 'comedy');
+    if (facets.has('romcom')) addBucket(() => getRomanticComedyContent(18), 'romantic comedy');
+    if (facets.has('family')) {
+      addBucket(() => getByGenre('movie', 10751, 24), 'family');
+      addBucket(() => getByGenre('movie', 16, 24), 'animation');
+    }
+    if (facets.has('lgbt')) addBucket(() => getLGBTContent(18), 'LGBT');
+    if (facets.has('femaleDirector')) addBucket(() => getFemaleDirectedContent(18), 'female directors');
+
+    if (facets.has('region-es')) addBucket(() => getRegionalContent('spanish'), 'spanish');
+    if (facets.has('region-uk')) addBucket(() => getRegionalContent('uk'), 'uk');
+    if (facets.has('region-au')) addBucket(() => getRegionalContent('australia'), 'australia');
+    if (facets.has('region-ca')) addBucket(() => getRegionalContent('canada'), 'canada');
+    if (facets.has('region-br')) addBucket(() => getRegionalContent('brazil'), 'brazil');
+    if (facets.has('region-de')) addBucket(() => getRegionalContent('germany'), 'germany');
+    if (facets.has('region-it')) cirrusQueries.push(`${userQuery} italian film trailer`);
+
+    // Cirrus queries
+    const base = `${userQuery} film`; // ensure "film" term is present
+    cirrusQueries.push(base);
+
+    if (facets.has('family')) {
+      cirrusQueries.push(`${userQuery} animated film`);
+      cirrusQueries.push(`${userQuery} cartoon film`);
+    }
+
+    if (facets.has('classic')) {
+      cirrusQueries.push(`${userQuery} silent film`);
+      cirrusQueries.push(`${userQuery} classic film`);
+    }
+    decades.forEach(d => {
+      cirrusQueries.push(`${userQuery} ${d}s film`);
+    });
+
+    if (facets.has('lgbt')) cirrusQueries.push(`${userQuery} lgbt film trailer`);
+    if (facets.has('femaleDirector')) cirrusQueries.push(`${userQuery} female director film trailer`);
+
+    // Default guard: if no facets, still keep 2 queries max
+    const uniqCirrus = Array.from(new Set(cirrusQueries)).slice(0, 3);
+
+    return { bucketCalls, cirrusQueries: uniqCirrus, labels, raw };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -147,32 +193,39 @@ export default function AIPage() {
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
 
     try {
-      // Get recommendations
-      const { message, searchQueries } = getAIRecommendations(userMessage);
+      const plan = buildSearchPlan(userMessage);
 
-      // Search TMDB for each query
       const allResults: Content[] = [];
       const seenIds = new Set<string>();
 
-      for (const query of searchQueries.slice(0, 3)) {
-        try {
-          console.log(`Searching TMDB for: ${query}`);
-          const results = await searchTMDB(query);
-          console.log(`Found ${results.length} results for: ${query}`);
-          // Add unique results
-          results.forEach((item: Content) => {
-            const key = `${item.type}-${item.id}`;
-            if (!seenIds.has(key) && allResults.length < 8) {
-              seenIds.add(key);
-              allResults.push(item);
-            }
-          });
-        } catch (err) {
-          console.error(`Search failed for: ${query}`, err);
+      // Run bucket calls in parallel
+      const bucketPromises = plan.bucketCalls.map(fn => fn().catch(() => [] as Content[]));
+      const cirrusPromises = plan.cirrusQueries.map(q => searchTMDB(q).catch(() => [] as Content[]));
+      const results = await Promise.all([...bucketPromises, ...cirrusPromises]);
+
+      results.flat().forEach(item => {
+        const key = `${item.type}-${item.id}`;
+        if (!seenIds.has(key) && allResults.length < 12) {
+          seenIds.add(key);
+          allResults.push(item);
         }
+      });
+
+      // Fallback if empty
+      if (allResults.length === 0) {
+        const fallback = await getHiddenGems();
+        fallback.slice(0, 8).forEach(item => {
+          const key = `${item.type}-${item.id}`;
+          if (!seenIds.has(key)) {
+            seenIds.add(key);
+            allResults.push(item);
+          }
+        });
       }
-      
-      console.log(`Total recommendations: ${allResults.length}`);
+
+      const message = allResults.length > 0
+        ? `Ecco qualche titolo dal catalogo Wikimedia che potrebbe piacerti (${plan.labels.join(', ') || 'mix'}).`
+        : "Non ho trovato risultati, riprova con altre parole chiave.";
 
       // Typewriter effect for AI response
       setIsTyping(true);
@@ -180,14 +233,13 @@ export default function AIPage() {
       let currentText = '';
       
       for (let i = 0; i < words.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 40));
         currentText += (i > 0 ? ' ' : '') + words[i];
         setTypingMessage(currentText);
       }
       
       setIsTyping(false);
       
-      // Add assistant message and update recommendations
       setMessages(prev => [
         ...prev,
         {
@@ -197,8 +249,6 @@ export default function AIPage() {
       ]);
       
       setTypingMessage('');
-      
-      // Update recommendations section
       setRecommendations(allResults);
     } catch (error) {
       console.error('Recommendation error:', error);
@@ -223,10 +273,10 @@ export default function AIPage() {
   };
 
   const suggestions = [
-    "Action movies with plot twists",
-    "Romantic comedies from the 2000s",
-    "Dark psychological thrillers",
-    "Feel-good family movies",
+    'Silent German expressionist horror',
+    'Italian romantic comedy',
+    'Brazilian classic musical',
+    'Female director documentaries',
   ];
 
   const handleSearchSubmit = (query: string) => {
