@@ -1,4 +1,14 @@
-### 4. `PLATFORM_ADAPTATION.md`
+# Platform Adaptation
+
+## Mobile (Capacitor)
+- Esegui `npm run build` prima di `npx cap copy`/`sync`.
+- Configura icone e splash per Android/iOS.
+- Riduci animazioni pesanti e usa immagini compresse per le liste.
+
+## Smart TV
+- Navigazione a fuoco: usa `react-tv-space-navigation` o gestione custom delle frecce (`Arrow*`, `Enter`).
+- Evidenzia bene il focus su ogni card (scale/bordo) con hit-box ampia.
+- Disabilita blur e ombre dinamiche su device lenti.### 4. `PLATFORM_ADAPTATION.md`
 
 ```markdown
 # PLATFORM_ADAPTATION.md

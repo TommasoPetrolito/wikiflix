@@ -1,110 +1,55 @@
-# 🎬 Flux
+# 🎬 Wikiflix
 
-A Netflix-inspired streaming platform UI built with React, TypeScript, and Vite.
+Wikiflix è un'app di streaming stile Netflix interamente client-side. Usa solo fonti aperte (Wikidata/Wikimedia Commons, Libreflix, Vimeo, YouTube, Internet Archive) e un catalogo statico generato offline con embedding semantici per la ricerca.
+Tale catalogo può però essere aggiornato automaticamente tramite lo script `tools/build_catalog.py`
 
-[![React](https://img.shields.io/badge/React-18.2-61DAFB?logo=react&logoColor=white)](https://reactjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.2-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-5.0-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+## Cosa offre
 
-<div align="center">
-  <img src="screenshots/home.png" alt="Flux Home Page" width="800"/>
-  <p><em>Home page with featured content hero section</em></p>
-  
-  <img src="screenshots/search.png" alt="Flux Search Page" width="800"/>
-  <p><em>Advanced search with filters and trending content</em></p>
-  
-  <img src="screenshots/movies.png" alt="Flux Movies Page" width="800"/>
-  <p><em>Movies page with categorized content</em></p>
-</div>
+- Frontend only: React + TypeScript + Vite, nessun backend proprietario.
+- Catalogo open: film con P10/P1651/P4015/P6614/P724 e filtri di dominio pubblico da Wikidata/Commons.
+- Player con sorgenti alternative: Commons, Libreflix, Vimeo, YouTube, Internet Archive.
+- Metadati arricchiti: registi, paesi, generi, lingua, durata, poster; hero/player/info mostrano direttori e paesi.
+- Ricerca locale: catalogo JSONL + indice ANN HNSW e FTS client-side (fusion ANN/FTS per ricerca ibrida).
+- Multilingua: labels/descrizioni preferite dalla lingua utente con fallback; selector lingua in UI.
 
-## Features
+## Architettura in breve
 
-- 75,000+ movies and TV shows via TMDB API
-- Netflix-inspired UI/UX design
-- Advanced search with actor profiles
-- Progress tracking and watch list
-- Live sports streaming
-- Fully responsive design
-- Type-safe with TypeScript
+- Build-time: [tools/build_catalog.py](tools/build_catalog.py) esegue SPARQL su Wikidata, arricchisce le label con `wbgetentities`, normalizza le URL sorgenti e genera catalogo + embedding + indice ANN.
+- Runtime: il client carica gli artifact statici, costruisce l'FTS locale, genera embedding query (stesso modello) e fonde i risultati; nessuna chiamata live a TMDB o servizi closed.
+- Dati ammessi: film con almeno una sorgente video aperta; esclusi trailer e elementi non film (vedi query in [DATA_INTEGRATION_TECHNICAL_README.md](DATA_INTEGRATION_TECHNICAL_README.md)).
 
-## Quick Start
+## Avvio rapido (app)
 
-```bash
-git clone https://github.com/Ennyw/flux.git
-cd flux
-npm install
+1. Node 18 (vedi [.nvmrc](.nvmrc)).
+2. `npm install`
+3. `npm run dev` → http://localhost:5173
 
-# Add your TMDB API key to .env
-# Get free key: https://www.themoviedb.org/settings/api
+Non servono API key esterne per i contenuti open attuali.
 
-npm run dev
-```
+## Generare il catalogo offline (manuale)
 
-Open [http://localhost:3000](http://localhost:3000)
+1. Python 3.10+ con venv attivo.
+2. `python -m pip install -r tools/requirements.txt`
+3. `python tools/build_catalog.py --out data/catalog --model intfloat/multilingual-e5-small --device cpu`
 
-## Setup
+Output in `data/catalog/`:
+- catalog.jsonl: righe tipo `Content` con sorgenti alternative e metadati.
+- embeddings.f32: matrice float32 normalizzata (row-major).
+- hnsw.index: indice ANN cosine.
+- ids.txt: QID per riga (ordine allineato).
+- manifest.json: metadati modello/file/dimensioni.
 
-1. Get a free TMDB API key: https://www.themoviedb.org/settings/api
-2. Create `.env` file:
-   ```env
-   VITE_TMDB_API_KEY=your_key_here
-   ```
-3. Run `npm run dev`
+Puoi passare `--query` per usare una SPARQL personalizzata o `--device cuda` se disponibile.
 
-## Tech Stack
+## Documentazione di supporto
 
-React 18 • TypeScript • Vite • TMDB API • TheSportsDB
+- [DATA_INTEGRATION_TECHNICAL_README.md](DATA_INTEGRATION_TECHNICAL_README.md) — pipeline dati, query SPARQL, norme URL.
+- [PROJECT_OVERVIEW_README.md](PROJECT_OVERVIEW_README.md) — visione e principi client-side.
+- [PLATFORM_ADAPTATION_README.md](PLATFORM_ADAPTATION_README.md) — note per web/mobile/TV.
+- [ROADMAP_TODO_README.md](ROADMAP_TODO_README.md) — stato lavori e step successivi.
+- [WIKIFLIX_UI_STRUCTURE_README.md](WIKIFLIX_UI_STRUCTURE_README.md) — struttura UI e categorie.
 
-## Learn From This Project
+## Licenza e note legali
 
-- Modern React patterns (hooks, context)
-- TypeScript best practices
-- API integration with TMDB
-- Responsive design patterns
-- Component architecture
-- State management
-
-## Documentation
-
-- [Setup Guide](SETUP.md) - Complete setup instructions
-- [Contributing](CONTRIBUTING.md) - How to contribute
-- [Security](SECURITY.md) - Security policy
-
-## Third-Party Services
-
-This project uses third-party APIs:
-
-- **TMDB API** - Movie/TV metadata (free API key required)
-- **TheSportsDB API** - Sports data (optional)
-- **Vidking API** - Video streaming for movies/TV shows (third-party service)
-- **ppv.to API** - Video streaming for sports (configured via VITE_STREAMS_API_URL)
-
-⚠️ **Critical Legal Notice**: 
-- This project was **AI-generated** using AI development tools
-- Video content is streamed through **Vidking** (movies/TV) and **ppv.to** (sports) or other third-party APIs, which the developer has no control over
-- The developer has **no knowledge** of what content these services provide
-- The developer **does not endorse** any third-party streaming services
-- You are **solely responsible** for compliance with all applicable copyright laws
-- The developers are **absolved of all liability** for content accessed through third-party APIs
-- This project is intended for **local/private use** only
-
-**The developer is not responsible for third-party API content or services.**
-
-See [DISCLAIMER.md](DISCLAIMER.md) for complete legal information.
-
-## License
-
-MIT License - see [LICENSE](LICENSE)
-
-## Disclaimer
-
-**AI-Generated Project**: This entire project was created using AI-assisted development tools (Cursor/Composer AI).
-
-This project is for **educational purposes only**. It is a UI/UX demonstration showcasing modern web development techniques. No copyrighted content is hosted or distributed. 
-
-**The developer has no control, knowledge, or responsibility for content provided by third-party APIs (including Vidking and ppv.to). This project was AI-generated. Users are solely responsible for compliance with all applicable laws, terms of service, and copyright regulations when using third-party APIs and services.**
-
----
-
-**Made with React + TypeScript + Vite**
+- Codice rilasciato sotto MIT (vedi [LICENSE](LICENSE)).
+- I contenuti video provengono da fonti aperte (Wikimedia Commons, Libreflix, Vimeo, YouTube, Internet Archive). Verifica sempre i diritti d'uso per ogni asset; l'app non ospita media proprietari.
