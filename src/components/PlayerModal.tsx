@@ -255,9 +255,25 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
         return;
       }
       if (v.kind === 'libreflix') {
-        const idMatch = v.url.match(/(?:libreflix\.org\/(?:title|video)\/)?([\w-]+)/i);
-        const libreId = idMatch?.[1] || v.url;
-        const embedUrl = libreId ? `https://libreflix.org/embed/${libreId}` : undefined;
+        let slug: string | undefined;
+        let pathFragment: string | undefined;
+        try {
+          const parsed = new URL(v.url);
+          const parts = parsed.pathname.split('/').filter(Boolean);
+          if (parts.length) {
+            slug = parts[parts.length - 1];
+            pathFragment = parts.join('/'); // e.g. i/nosferatu-1922
+          }
+        } catch (e) {
+          // fallback regex for raw slugs
+          const m = v.url.match(/([\w-]+)$/);
+          slug = m?.[1];
+        }
+        const embedUrl = pathFragment && /^(i|assistir)\//i.test(pathFragment)
+          ? `https://libreflix.org/${pathFragment}` // use full page, inside iframe
+          : slug
+            ? `https://libreflix.org/assistir/${slug}`
+            : undefined;
         list.push({
           key: `alt-${idx}-${v.url}`,
           label: v.label || 'Libreflix',

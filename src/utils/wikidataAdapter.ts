@@ -124,6 +124,11 @@ const GENRE_QUERY_MAP: Record<number, string[]> = {
   10765: ['science fiction television film trailer', 'science fiction tv trailer'],
 };
 
+// Optional manual Libreflix mapping: Wikidata Q-id -> Libreflix slug
+const LIBREFLIX_BY_ID: Record<string, string> = {
+  Q151895: 'nosferatu-1922',
+};
+
 const categoryCache = new Map<string, Content[]>();
 const inflightCategory = new Map<string, Promise<Content[]>>();
 
@@ -313,6 +318,7 @@ const mapEntityToContent = (entity: WikidataEntity): Content | null => {
   const year = dateClaim && typeof dateClaim === 'string' ? Number(dateClaim.slice(0, 4)) : undefined;
   const youtubeIds = collectClaimValues(claims.P1651);
   const archiveIds = collectClaimValues(claims.P724);
+  const libreflixIds = collectClaimValues(claims.P6614);
   const licenseClaim = extractClaimValue(claims.P275?.[0]);
   const durationClaim = parseDurationSeconds(claims.P2047?.[0]);
   const genreIds = collectClaimValues(claims.P136);
@@ -330,10 +336,19 @@ const mapEntityToContent = (entity: WikidataEntity): Content | null => {
 
   const primaryVideo = videoClaims[0];
 
-  const altVideos: Array<{ kind: 'commons' | 'youtube' | 'archive'; url: string; label?: string; lang?: string }> = [];
+  const altVideos: Array<{ kind: 'commons' | 'youtube' | 'archive' | 'libreflix'; url: string; label?: string; lang?: string }> = [];
   videoClaims.slice(1).forEach((v) => altVideos.push({ kind: 'commons', url: v.url, label: v.lang ? `${v.lang}` : undefined, lang: v.lang }));
   youtubeIds.forEach((id) => altVideos.push({ kind: 'youtube', url: `https://www.youtube.com/watch?v=${id}`, label: 'YouTube' }));
   archiveIds.forEach((id) => altVideos.push({ kind: 'archive', url: `https://archive.org/details/${id}`, label: 'Internet Archive' }));
+
+  const libreSlug = libreflixIds[0] || LIBREFLIX_BY_ID[entity.id];
+  if (libreSlug) {
+    altVideos.push({
+      kind: 'libreflix',
+      url: `https://libreflix.org/assistir/${libreSlug}`,
+      label: 'Libreflix',
+    });
+  }
 
   const commonsLink = entity.sitelinks?.commonswiki?.url
     || (entity.sitelinks?.commonswiki?.title
