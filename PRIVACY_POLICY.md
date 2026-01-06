@@ -32,6 +32,3 @@ Last updated: 2026-01-06
 
 10. Contact
 -	For privacy questions or requests, contact: maintainer@example.com
-
-Notes for Play Console
--	Google Play requires a publicly accessible HTTPS URL for the privacy policy. You can host this file using GitHub Pages (recommended) or use a stable URL on your website. If you need, I can help publish this repository to GitHub Pages or provide the raw file URL.
