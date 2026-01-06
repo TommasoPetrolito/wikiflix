@@ -10,23 +10,11 @@ import { Content, Category } from './types';
 import { addToContinueWatching, getContinueWatching, migrateKnownFixes, getMyList } from './utils/storage';
 import { usePlayerTracking } from './hooks/usePlayerTracking';
 import { useTVNavigation } from './hooks/useTVNavigation';
-import { searchTMDB, getTrendingMovies, getTopRatedMovies, getTopRatedTV, getTop10, getByGenre, getTrendingTV, getRecommendations, getUpcomingMovies, getCriticallyAcclaimed, getHiddenGems, getTrendingToday, getMoviesByActor, findCollectionByMovie, getRecentlyAdded, getForYouContent, getRegionalContent, getFemaleDirectedContent, getLGBTContent, getScienceFictionContent, getRomanticComedyContent } from './utils/wikidataAdapter';
+import { searchTMDB, getTrendingMovies, getTopRatedMovies, getTop10, getByGenre, getTrendingTV, getRecommendations, getUpcomingMovies, getCriticallyAcclaimed, getHiddenGems, getTrendingToday, getMoviesByActor, findCollectionByMovie, getRecentlyAdded, getForYouContent, getRegionalContent, getFemaleDirectedContent, getLGBTContent, getScienceFictionContent, getRomanticComedyContent } from './utils/wikidataAdapter';
 import { MoodSelector } from './components/MoodSelector';
 import './App.css';
 
-const FALLBACK_CONTENT: Content = {
-  id: 'fallback-clockwork',
-  title: 'A Clockwork Orange (Trailer)',
-  type: 'movie',
-  year: 1971,
-  poster: 'https://commons.wikimedia.org/wiki/Special:FilePath/Clockwork%20Orange%20Trailer%20poster.png',
-  backdrop: 'https://commons.wikimedia.org/wiki/Special:FilePath/Bergman%20%26%20Bogart%20Casablanca%20still.jpg',
-  description: 'Fallback trailer from Wikimedia Commons.',
-  videoUrl: 'https://upload.wikimedia.org/wikipedia/commons/8/87/A_Clockwork_Orange_%281971%29_-_Trailer.webm',
-  subtitles: undefined,
-  genres: ['Drama'],
-  cast: [],
-};
+const FALLBACK_CONTENT: Content | null = null;
 
 function App() {
   const [currentCategory, setCurrentCategory] = useState<Category>('all');
@@ -36,7 +24,7 @@ function App() {
   const [continueWatching, setContinueWatching] = useState<Content[]>(getContinueWatching());
   const [searchResults, setSearchResults] = useState<Content[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [heroContent, setHeroContent] = useState<Content | null>(FALLBACK_CONTENT);
+  const [heroContent, setHeroContent] = useState<Content | null>(null);
   const [trendingMovies, setTrendingMovies] = useState<Content[]>([]);
   const [isLoadingHero, setIsLoadingHero] = useState(false);
   const [rowAction, setRowAction] = useState<Content[]>([]);
@@ -274,10 +262,10 @@ function App() {
           getTrendingTV(),
         ]);
         const combined = [...movies, ...tv];
-        setTrendingMovies(combined.length > 0 ? combined : [FALLBACK_CONTENT]);
+        setTrendingMovies(combined.length > 0 ? combined : []);
       } catch (error) {
         console.error('Error loading trending content:', error);
-        setTrendingMovies([FALLBACK_CONTENT]);
+        setTrendingMovies([]);
       }
     };
 
@@ -303,9 +291,6 @@ function App() {
         if (currentCategory === 'movies') {
           // Fetch top-rated movies for movie category
           content = await getTopRatedMovies();
-        } else if (currentCategory === 'tv') {
-          // Fetch top-rated TV shows for TV category
-          content = await getTopRatedTV();
         } else {
           // For 'all', fetch trending movies
           content = await getTrendingMovies();
@@ -316,11 +301,11 @@ function App() {
           const randomIndex = Math.floor(Math.random() * Math.min(5, content.length));
           setHeroContent(content[randomIndex]);
         } else {
-          setHeroContent(FALLBACK_CONTENT);
+          setHeroContent(null);
         }
       } catch (error) {
         console.error('Error loading hero content:', error);
-        setHeroContent(FALLBACK_CONTENT);
+        setHeroContent(null);
       } finally {
         setIsLoadingHero(false);
       }
@@ -362,7 +347,6 @@ function App() {
   const filteredContent = useMemo(() => {
     const filterByCategory = (items: Content[]) => {
       if (currentCategory === 'movies') return items.filter(i => i.type === 'movie');
-      if (currentCategory === 'tv') return items.filter(i => i.type === 'tv');
       return items;
     };
 
@@ -630,30 +614,45 @@ function App() {
 
   // Use dynamic hero content from TMDB or fallback to featured content
   const displayedHeroContent = useMemo(() => {
-    const baseHero = heroContent && heroContent.backdrop ? heroContent : FALLBACK_CONTENT;
-    const heroItems: Content[] = [baseHero];
+    const isVideoUrl = (url: string) => /\.(webm|mp4|ogv|ogg|mkv)(\?|$)/i.test(url);
+    const hasBackdrop = (c: Content | null | undefined) => {
+      const src = c?.backdrop?.trim() || '';
+      if (!src) return false;
+      if (isVideoUrl(src)) return false;
+      return true;
+    };
+    const sampleRandom = (items: Content[], count: number) => {
+      const pool = [...items];
+      for (let i = pool.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      return pool.slice(0, count);
+    };
 
-    // Add up to 4 extras with backdrops from the most relevant row
-    let extraPool: Content[] = [];
-    if (currentCategory === 'all') extraPool = trendingMovies;
-    else if (currentCategory === 'movies') extraPool = rowAction;
-    else if (currentCategory === 'tv') extraPool = rowComedy;
-
-    heroItems.push(
-      ...extraPool
-        .filter(m => m.id !== baseHero.id && m.backdrop && m.backdrop.trim())
-        .slice(0, 4)
-    );
-
-    // If searching, prioritize search results as hero
+    // If searching, prioritize search results as hero and keep only items with images
     if (searchQuery.trim() && searchResults.length > 0) {
-      return searchResults
-        .filter(c => c.backdrop && c.backdrop.trim())
-        .slice(0, 5);
+      const withImages = searchResults.filter(hasBackdrop);
+      const picked = sampleRandom(withImages, 5);
+      return picked.length > 0 ? picked : [];
     }
 
-    const filtered = heroItems.filter(c => c.backdrop && c.backdrop.trim());
-    return filtered.length > 0 ? filtered : [FALLBACK_CONTENT];
+    const baseHero = heroContent && hasBackdrop(heroContent) ? heroContent : null;
+    const heroPool: Content[] = [];
+    if (baseHero) heroPool.push(baseHero);
+
+    // Add a pool based on category for variety
+    if (currentCategory === 'all') heroPool.push(...trendingMovies);
+    else if (currentCategory === 'movies') heroPool.push(...rowAction);
+
+    const withImages = heroPool.filter(hasBackdrop);
+    const uniqueById = new Map<string, Content>();
+    withImages.forEach((item) => {
+      if (!uniqueById.has(item.id)) uniqueById.set(item.id, item);
+    });
+
+    const sampled = sampleRandom(Array.from(uniqueById.values()), 5);
+    return sampled.length > 0 ? sampled : [];
   }, [heroContent, currentCategory, trendingMovies, rowAction, rowComedy, searchQuery, searchResults]);
 
   return (

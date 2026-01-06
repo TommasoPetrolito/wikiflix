@@ -189,6 +189,8 @@ class CatalogItem:
     poster: Optional[str]
     backdrop: Optional[str]
     video_url: Optional[str]
+    commons_link: Optional[str]
+    wikipedia_url: Optional[str]
     alt_videos: List[Dict]
     director_ids: List[str]
     genre_ids: List[str]
@@ -227,9 +229,31 @@ def split_ids(value: Optional[str]) -> List[str]:
 def commons_to_filepath(url: Optional[str]) -> Optional[str]:
     if not url:
         return None
+    name = pathlib.Path(url).name
+    if not name:
+        return None
+    # Decode once in case the source string already contains %xx escapes, then re-encode safely.
+    decoded = requests.utils.unquote(name)
+    encoded = requests.utils.quote(decoded)
     if "Special:FilePath" in url:
-        return url
-    return f"https://commons.wikimedia.org/wiki/Special:FilePath/{requests.utils.quote(pathlib.Path(url).name)}"
+        return f"https://commons.wikimedia.org/wiki/Special:FilePath/{encoded}"
+    return f"https://commons.wikimedia.org/wiki/Special:FilePath/{encoded}"
+
+
+def commons_to_filepage(url: Optional[str]) -> Optional[str]:
+    if not url:
+        return None
+    try:
+        name = pathlib.Path(url).name
+        if name:
+            # Decode once to strip any existing % escapes, then re-encode exactly once to avoid %2520
+            decoded = requests.utils.unquote(name)
+            normalized = decoded.replace(" ", "_")
+            encoded = requests.utils.quote(normalized)
+            return f"https://commons.wikimedia.org/wiki/File:{encoded}"
+    except Exception:
+        return None
+    return None
 
 
 def load_labels_cache(path: pathlib.Path) -> Dict[str, Dict[str, str]]:
@@ -499,7 +523,9 @@ def build_catalog(
         duration_seconds = normalize_duration_seconds(duration_amount, duration_unit, duration_raw)
         poster = commons_to_filepath(binding_val(r, "image"))
 
-        commons = commons_to_filepath(binding_val(r, "commonsVideo"))
+        commons_raw = binding_val(r, "commonsVideo")
+        commons = commons_to_filepath(commons_raw)
+        commons_link = commons_to_filepage(commons_raw)
         youtube = binding_val(r, "youtubeID")
         vimeo = binding_val(r, "vimeoID")
         libreflix = binding_val(r, "libreflixID")
@@ -529,6 +555,19 @@ def build_catalog(
         license_label = pick_label(labels.get(license_id, {})) if license_id else None
         language_label = pick_label(labels.get(language_ids[0], {})) if language_ids else None
 
+        def pick_wikipedia_url() -> Optional[str]:
+            sites = sitelinks.get(qid, {})
+            for lang in LABEL_LANGS:
+                title = sites.get(lang)
+                if title:
+                    return f"https://{lang}.wikipedia.org/wiki/{requests.utils.quote(title.replace(' ', '_'))}"
+            if sites:
+                lang, title = next(iter(sites.items()))
+                return f"https://{lang}.wikipedia.org/wiki/{requests.utils.quote(title.replace(' ', '_'))}"
+            return None
+
+        wikipedia_url = pick_wikipedia_url()
+
         items.append(
             CatalogItem(
                 id=qid,
@@ -541,6 +580,8 @@ def build_catalog(
                 poster=poster,
                 backdrop=poster,
                 video_url=video_url,
+                commons_link=commons_link,
+                wikipedia_url=wikipedia_url,
                 alt_videos=alt_videos,
                 director_ids=director_ids,
                 genre_ids=genre_ids,
@@ -587,6 +628,8 @@ def to_jsonl(items: Iterable[CatalogItem], labels: Dict[str, Dict[str, str]], pa
                 "poster": it.poster,
                 "backdrop": it.backdrop,
                 "videoUrl": it.video_url,
+                "commonsLink": it.commons_link,
+                "wikipediaUrl": it.wikipedia_url,
                 "altVideos": it.alt_videos or None,
                 "directorIds": it.director_ids or None,
                 "genreIds": it.genre_ids or None,

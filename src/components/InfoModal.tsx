@@ -30,18 +30,23 @@ export const InfoModal = ({ content, onClose, onPlay }: InfoModalProps) => {
     if (!text) return '';
     let out = text.replace(/==+\s*(.*?)\s*==+/g, '$1\n');
     out = out.replace(/\r/g, '');
-      const pickDescription = (): string | undefined => {
-        const descMap = content.descriptions || {};
-        const lang = preferredLang;
-        const fallbackOrder = [lang, ...fallbacks];
-        for (const code of fallbackOrder) {
-          const d = descMap[code];
-          if (d) return d;
-        }
-        return content.descriptionLong || content.description;
-      };
+    out = out.replace(/\n{3,}/g, '\n\n');
     return out.trim();
   }, []);
+
+  const pickDescription = (): string | undefined => {
+    const descMap = content.descriptions || {};
+    const lang = preferredLang;
+    const fallbackOrder = [lang, ...fallbacks];
+    for (const code of fallbackOrder) {
+      const d = descMap[code];
+      if (d) return d;
+    }
+    return content.descriptionLong || content.description;
+  };
+
+  const displayDescription = richDescription || pickDescription();
+  const formattedDescription = formatExtract(displayDescription);
 
   useEffect(() => {
     setRichDescription(null);
@@ -114,15 +119,15 @@ export const InfoModal = ({ content, onClose, onPlay }: InfoModalProps) => {
             </div>
           </div>
 
-          {(richDescription || content.descriptionLong || content.description) && (
+          {formattedDescription && (
             <p className="info-description long">
-              {formatExtract(richDescription || content.descriptionLong || content.description)}
+              {formattedDescription}
             </p>
           )}
 
           <div className="info-meta-grid">
             {content.license && (
-                  {formatExtract(richDescription || pickDescription())}
+              <div className="info-meta">
                 <div className="info-meta-label">Licenza</div>
                 <div className="info-meta-value">{content.license}</div>
               </div>

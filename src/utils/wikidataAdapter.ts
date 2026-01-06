@@ -14,6 +14,9 @@ interface CatalogItem {
   descriptions?: Record<string, string>;
   videoUrl?: string;
   altVideos?: Array<{ kind: string; url: string; label?: string }>;
+  commonsLink?: string;
+  wikipediaUrl?: string;
+  license?: string;
   genres?: Array<{ id: string; label: string }>;
   instances?: Array<{ id: string; label: string }>;
   directors?: Array<{ id: string; label: string }>;
@@ -111,6 +114,7 @@ const mapItemToContent = (item: CatalogItem): Content => {
 
   return {
     id: item.id || item.wikidataId || crypto.randomUUID(),
+    wikidataId: item.wikidataId || item.id,
     title: item.title,
     titleLabels: item.titleLabels,
     type: item.type === 'tv' ? 'tv' : 'movie',
@@ -120,6 +124,8 @@ const mapItemToContent = (item: CatalogItem): Content => {
     description,
     descriptionLong: item.descriptionLong,
     descriptions: item.descriptions,
+    commonsLink: item.commonsLink,
+    wikipediaUrl: item.wikipediaUrl,
     videoUrl: item.videoUrl,
     altVideos: item.altVideos?.map(v => ({
       kind: (v.kind as any) || 'commons',
@@ -130,6 +136,7 @@ const mapItemToContent = (item: CatalogItem): Content => {
     genres: item.genres?.map(g => g.label),
     directors: item.directors?.map(d => d.label),
     countries: item.countries?.map(c => c.label),
+    license: item.license,
     durationSeconds: (item as any).durationSeconds,
   };
 };

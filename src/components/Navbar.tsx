@@ -45,12 +45,6 @@ export const Navbar = ({ currentCategory, onCategoryChange, searchQuery, onSearc
     onCategoryChange('movies');
   };
 
-  const handleTVClick = () => {
-    if (location.pathname !== '/') {
-      navigate('/');
-    }
-    onCategoryChange('tv');
-  };
 
   return (
     <nav className={`navbar ${scrolled ? 'scrolled' : ''}`}>
@@ -92,13 +86,6 @@ export const Navbar = ({ currentCategory, onCategoryChange, searchQuery, onSearc
             aria-label="Movies"
           >
             Movies
-          </button>
-          <button
-            className={`nav-link ${currentCategory === 'tv' && location.pathname === '/' ? 'active' : ''}`}
-            onClick={handleTVClick}
-            aria-label="TV Shows"
-          >
-            TV Shows
           </button>
         </div>
 

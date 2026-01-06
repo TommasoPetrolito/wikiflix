@@ -70,7 +70,7 @@ export default function SearchPage() {
       setQ('');
     }
   }, [location.pathname]);
-  const [typeFilter, setTypeFilter] = useState<'all' | 'movie' | 'tv'>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'movie'>('all');
   const [genreFilter, setGenreFilter] = useState<number | null>(null);
   const [yearFrom, setYearFrom] = useState<number | ''>('');
   const [yearTo, setYearTo] = useState<number | ''>('');
@@ -87,11 +87,8 @@ export default function SearchPage() {
   // Load trending content for empty state
   useEffect(() => {
     const loadTrending = async () => {
-      const [movies, tv] = await Promise.all([
-        getTrendingMovies(),
-        getTrendingTV(),
-      ]);
-      setTrendingContent([...movies.slice(0, 10), ...tv.slice(0, 10)]);
+      const movies = await getTrendingMovies();
+      setTrendingContent(movies.slice(0, 20));
     };
     loadTrending();
   }, []);
@@ -182,7 +179,7 @@ export default function SearchPage() {
     return items;
   }, [results, typeFilter, yearFrom, yearTo, sortBy]);
 
-  const currentGenres = typeFilter === 'all' ? [...GENRES.movie, ...GENRES.tv] : GENRES[typeFilter];
+  const currentGenres = GENRES.movie;
   const uniqueGenres = currentGenres.filter((g, idx, arr) =>
     arr.findIndex((x) => x.id === g.id && x.name === g.name) === idx
   );
@@ -291,7 +288,7 @@ export default function SearchPage() {
           <div className="filter-group">
             <label>Type</label>
             <div className="filter-buttons">
-              {(['all', 'movie', 'tv'] as const).map(t => (
+              {(['all', 'movie'] as const).map(t => (
                 <button
                   key={t}
                   onClick={() => {
@@ -300,7 +297,7 @@ export default function SearchPage() {
                   }}
                   className={`filter-btn ${typeFilter === t ? 'active' : ''}`}
                 >
-                  {t === 'all' ? 'All' : t === 'movie' ? 'Movies' : 'TV Shows'}
+                  {t === 'all' ? 'All' : 'Movies'}
                 </button>
               ))}
             </div>
@@ -412,7 +409,7 @@ export default function SearchPage() {
         {filtered.length > 0 && (
           <div className="results-section">
             <div className="results-header">
-              <h2>{q.trim() ? `Movies & TV Shows` : 'Browse by Genre'}</h2>
+              <h2>{q.trim() ? `Movies` : 'Browse by Genre'}</h2>
               <span className="results-count">{filtered.length} {filtered.length === 1 ? 'result' : 'results'}</span>
             </div>
             <ContentGrid

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Content } from '@/types';
+import { useLanguage } from '@/contexts/LanguageContext';
 import './Hero.css';
 
 interface HeroProps {
@@ -13,6 +14,7 @@ export const Hero = ({ content, onPlay, onInfo }: HeroProps) => {
   const [isPaused, setIsPaused] = useState(false);
   const [isContentTransitioning, setIsContentTransitioning] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { preferredLang, fallbacks } = useLanguage();
 
   // Reset slide index when content changes length
   useEffect(() => {
@@ -79,8 +81,18 @@ export const Hero = ({ content, onPlay, onInfo }: HeroProps) => {
   const currentContent = content[safeIndex];
   if (!currentContent) return null;
 
+  const pickDescription = (entry: Content): string => {
+    const descMap = entry.descriptions || {};
+    const order = [preferredLang, ...fallbacks];
+    for (const code of order) {
+      const d = descMap[code];
+      if (d) return d;
+    }
+    return entry.descriptionLong || entry.description || '';
+  };
+
   const buildTeaser = (entry: Content) => {
-    const raw = entry.descriptionLong || entry.description || '';
+    const raw = pickDescription(entry);
     const cleaned = raw
       .replace(/==[^=]+==/g, ' ')
       .replace(/\n+/g, ' ')

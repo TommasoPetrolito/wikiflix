@@ -248,6 +248,32 @@
   text-transform: uppercase;
 }
 
+.card-links {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.card-link {
+  font-size: 0.78rem;
+  color: #d5e2ff;
+  text-decoration: none;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid rgba(213, 226, 255, 0.25);
+  border-radius: 8px;
+  background: rgba(12, 16, 24, 0.55);
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.card-link:hover,
+.card-link:focus-visible {
+  color: #ffffff;
+  border-color: rgba(229, 9, 20, 0.7);
+  background: rgba(229, 9, 20, 0.18);
+  outline: none;
+}
+
 .card-progress {
   position: absolute;
   bottom: 0;

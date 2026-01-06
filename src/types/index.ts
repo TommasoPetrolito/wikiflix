@@ -54,5 +54,5 @@ export interface PlayerEvent {
   };
 }
 
-export type Category = 'all' | 'movies' | 'tv';
+export type Category = 'all' | 'movies';
 

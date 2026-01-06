@@ -172,6 +172,26 @@ export const ContentCard = ({ content, onClick, onPreviewChange, variant = 'defa
             <span>•</span>
             <span>{content.type === 'movie' ? 'Movie' : 'TV Show'}</span>
           </div>
+          {(content.wikipediaUrl || content.commonsLink || content.wikidataId) && (
+            <div className="card-links">
+              {content.wikipediaUrl && (
+                <a className="card-link" href={content.wikipediaUrl} target="_blank" rel="noreferrer">Wikipedia</a>
+              )}
+              {content.commonsLink && (
+                <a className="card-link" href={content.commonsLink} target="_blank" rel="noreferrer">Commons</a>
+              )}
+              {content.wikidataId && (
+                <a
+                  className="card-link"
+                  href={`https://www.wikidata.org/wiki/${content.wikidataId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Wikidata
+                </a>
+              )}
+            </div>
+          )}
         </div>
         
         {progress && (
