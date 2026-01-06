@@ -37,3 +37,7 @@ dist-ssr
 # Local reference files (not for repo)
 GITHUB_TOPICS.md
 
+
+# Android signing keystore (do not commit)
+android/app/release-keystore.jks
+
