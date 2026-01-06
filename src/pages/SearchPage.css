@@ -475,6 +475,12 @@
   position: relative;
 }
 
+.genre-select option,
+.sort-select option {
+  background: #0c0c10;
+  color: #f2f2f2;
+}
+
 .genre-select:hover,
 .sort-select:hover {
   background: rgba(255, 255, 255, 0.06);
