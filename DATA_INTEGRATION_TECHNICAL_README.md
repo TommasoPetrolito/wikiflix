@@ -71,14 +71,17 @@ Mappatura dei dati salvata in `localStorage` per evitare chiamate ripetitive.
 ```
 ```
 SELECT 
-  ?item ?itemLabel ?itemDescription ?year 
-  ?directorID ?image 
-  ?commonsVideo ?youtubeID ?vimeoID ?libreflixID ?iaID 
-  ?instanceIDs ?genreIDs ?licenseIDs ?languageIDs ?countryIDs
+    ?item ?itemLabel ?itemDescription ?year 
+    ?directorID ?image 
+        ?commonsVideo ?youtubeID ?vimeoID ?libreflixID ?iaID 
+        ?instanceIDs ?genreIDs ?licenseIDs ?languageIDs ?countryIDs ?durationAmount ?durationUnit ?durationRaw
 WHERE {
   {
     SELECT ?item 
            (SAMPLE(YEAR(?pubDate)) AS ?year)
+            (SAMPLE(?durationAmount) AS ?durationAmount)
+            (SAMPLE(?durationUnit) AS ?durationUnit)
+            (SAMPLE(?durationRaw) AS ?durationRaw)
            (SAMPLE(?poster) AS ?image)
            (SAMPLE(?commons) AS ?commonsVideo) 
            (SAMPLE(?youtube) AS ?youtubeID) 
@@ -92,26 +95,23 @@ WHERE {
            (GROUP_CONCAT(DISTINCT ?language; separator=",") AS ?languageIDs)
            (GROUP_CONCAT(DISTINCT ?country; separator=",") AS ?countryIDs)
     WHERE {
-      # 1. Base: Film
       ?item wdt:P31/wdt:P279* wd:Q11424 .
-      
-      # 2. Filtro Ibrido Legale (Sempre necessario alla base)
       {
-        { ?item wdt:P6216 wd:Q19652 . } UNION 
-        { ?item wdt:P10 ?commons . } UNION 
+        { ?item wdt:P6216 wd:Q19652 . } UNION
+        { ?item wdt:P10 ?commons . } UNION
         { ?item wdt:P577 ?pubDate . FILTER(YEAR(?pubDate) < 1926) }
       }
-      
-      # 3. Almeno una fonte video
-      {
-        { ?item wdt:P10 ?commons . } UNION 
-        { ?item wdt:P1651 ?youtube . } UNION 
-        { ?item wdt:P4015 ?vimeo . } UNION 
-        { ?item wdt:P6614 ?libreflix . } UNION 
-        { ?item wdt:P724 ?ia . }
-      }
-
-      # 4. Estrazione ID puri (P*)
+            {
+                {
+                    ?item p:P10 ?commonsStmt .
+                    FILTER NOT EXISTS { ?commonsStmt pq:P3831 wd:Q622550 }
+                    ?commonsStmt ps:P10 ?commons .
+                } UNION
+                { ?item wdt:P1651 ?youtube . } UNION
+                { ?item wdt:P4015 ?vimeo . } UNION
+                { ?item wdt:P6614 ?libreflix . } UNION
+                { ?item wdt:P724 ?ia . }
+            }
       OPTIONAL { ?item wdt:P31 ?instanceOf . }
       OPTIONAL { ?item wdt:P136 ?genre . }
       OPTIONAL { ?item wdt:P275 ?license . }
@@ -119,20 +119,19 @@ WHERE {
       OPTIONAL { ?item wdt:P495 ?country . }
       OPTIONAL { ?item wdt:P57 ?dir . }
       OPTIONAL { ?item wdt:P18 ?poster . }
-      OPTIONAL { ?item wdt:P577 ?pubDate . }
-
-      # 5. Esclusioni rapide
-      MINUS { ?item wdt:P31 wd:Q97570383 } # No glass positives
-      MINUS { ?item p:P10/pq:P3831 wd:Q622550 } # No trailer
-    } 
+            OPTIONAL { ?item wdt:P577 ?pubDate . }
+            OPTIONAL {
+                ?item p:P2047 ?durationStatement .
+                ?durationStatement psv:P2047 ?durationValue .
+                ?durationValue wikibase:quantityAmount ?durationAmount .
+                ?durationValue wikibase:quantityUnit ?durationUnit .
+            }
+            OPTIONAL { ?item wdt:P2047 ?durationRaw . }
+    MINUS { ?item wdt:P31 wd:Q97570383 }
+    }
     GROUP BY ?item
   }
-  
-  # 6. Label Service (Solo per itemLabel e itemDescription)
-  # Usiamo il fallback di lingue che hai scelto
-  SERVICE wikibase:label { 
-    bd:serviceParam wikibase:language "en,fr,de,es,pt,it,nl,da,sv,no,sl,sk,cz,bg,hu,po,pl,ru". 
-  }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,fr,de,es,pt,it,nl,da,sv,no,sl,sk,cz,bg,hu,po,pl,ru". }
 }
 ORDER BY ?item
 

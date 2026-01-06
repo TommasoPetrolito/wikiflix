@@ -46,7 +46,7 @@ Tale catalogo può però essere aggiornato automaticamente tramite lo script `to
 
 1. Python 3.10+ con venv attivo.
 2. `python -m pip install -r tools/requirements.txt`
-3. `python tools/build_catalog.py --out data/catalog --model intfloat/multilingual-e5-small --device cpu`
+3. `python tools/build_catalog.py --out public/catalog --model intfloat/multilingual-e5-small --device cpu`
 
 **Output in `data/catalog/`:**
 
