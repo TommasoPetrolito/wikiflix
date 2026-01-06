@@ -286,15 +286,17 @@ function App() {
     const loadHeroContent = async () => {
       setIsLoadingHero(true);
       try {
-        // Use getRandomHero to fetch 5 unique random items
+        // Use getRandomHero to fetch 5 unique random items with image backdrops only
         const { getRandomHero } = await import('./utils/wikidataAdapter');
         const type = currentCategory === 'movies' ? 'movie' : 'all';
         const items: Content[] = [];
         const ids = new Set<string>();
-        // Try to get 5 unique items
-        for (let i = 0; i < 10 && items.length < 5; i++) {
+        const isVideoUrl = (url: string) => /\.(webm|mp4|ogv|ogg|mkv)(\?|$)/i.test(url);
+        // Try to get 5 unique items with image backdrops only
+        for (let i = 0; i < 20 && items.length < 5; i++) {
           const item = await getRandomHero(type);
-          if (item && !ids.has(item.id)) {
+          const backdrop = item?.backdrop || '';
+          if (item && !ids.has(item.id) && backdrop && !isVideoUrl(backdrop)) {
             items.push(item);
             ids.add(item.id);
           }
