@@ -291,12 +291,12 @@ function App() {
         const type = currentCategory === 'movies' ? 'movie' : 'all';
         const items: Content[] = [];
         const ids = new Set<string>();
-        const isVideoUrl = (url: string) => /\.(webm|mp4|ogv|ogg|mkv)(\?|$)/i.test(url);
-        // Try to get 5 unique items with image backdrops only
-        for (let i = 0; i < 20 && items.length < 5; i++) {
+        const isImageUrl = (url: string) => /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url);
+        // Try to get 5 unique items with image backdrops only (include only image formats)
+        for (let i = 0; i < 30 && items.length < 5; i++) {
           const item = await getRandomHero(type);
           const backdrop = item?.backdrop || '';
-          if (item && !ids.has(item.id) && backdrop && !isVideoUrl(backdrop)) {
+          if (item && !ids.has(item.id) && backdrop && isImageUrl(backdrop)) {
             items.push(item);
             ids.add(item.id);
           }
