@@ -2,11 +2,13 @@
 
 Wikiflix è un'app di streaming stile Netflix interamente client-side. Usa solo fonti aperte (Wikidata/Wikimedia Commons, Libreflix, Vimeo, YouTube, Internet Archive) e un catalogo statico generato offline con embedding semantici per la ricerca.
 
-<p align="center">
-<img src="screenshots/screenshot_streaming_pilot.png" width="800" alt="Wikiflix Home Screen">
-</p>
-
 Tale catalogo può però essere aggiornato automaticamente tramite lo script `tools/build_catalog.py`.
+
+### Anteprima dell'applicazione
+
+| Home Screen | Scheda Film (Movie Card) | Ricerca Semantica |
+| --- | --- | --- |
+| <img src="screenshots/screenshot_streaming_pilot.png" width="350" alt="Home"> | <img src="screenshots/screenshot_streaming_pilot_2.png" width="350" alt="Movie Card"> | <img src="screenshots/screenshot_streaming_pilot_3.png" width="350" alt="Search"> |
 
 ---
 
@@ -18,12 +20,6 @@ Tale catalogo può però essere aggiornato automaticamente tramite lo script `to
 * **Metadati arricchiti**: registi, paesi, generi, lingua, durata, poster; hero/player/info mostrano direttori e paesi.
 * **Ricerca locale**: catalogo JSONL + indice ANN HNSW e FTS client-side (fusion ANN/FTS per ricerca ibrida).
 * **Multilingua**: labels/descrizioni preferite dalla lingua utente con fallback; selector lingua in UI.
-
-### Preview Interfaccia
-
-| Scheda Film (Movie Card) | Ricerca Semantica |
-| --- | --- |
-| <img src="screenshots/screenshot_streaming_pilot_2.png" width="400"> | <img src="screenshots/screenshot_streaming_pilot_3.png" width="400"> |
 
 ---
 
