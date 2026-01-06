@@ -55,7 +55,8 @@
 .lang-menu {
   position: absolute;
   top: 110%;
-  min-width: 220px;
+  min-width: 200px;
+  max-width: min(280px, 90vw);
   background: rgba(9,12,20,0.95);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 12px;
@@ -67,6 +68,33 @@
   z-index: 10;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  right: 0;
+  left: auto;
+  transform-origin: top right;
+}
+
+@media (max-width: 768px) {
+  .lang-menu {
+    right: 0;
+    left: auto;
+    min-width: 180px;
+    max-width: min(240px, 92vw);
+  }
+  .lang-picker.align-left .lang-menu {
+    right: 0; /* On mobile force it to stay inside viewport */
+    left: auto;
+  }
+}
+
+/* On narrower layouts (nav items wrap), force dropdown to open to the right to avoid spilling left of the viewport */
+@media (max-width: 1200px) {
+  .lang-menu,
+  .lang-picker.align-left .lang-menu,
+  .lang-picker.align-right .lang-menu {
+    left: 0;
+    right: auto;
+    transform-origin: top left;
+  }
 }
 
 .lang-menu-item {

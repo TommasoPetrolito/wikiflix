@@ -237,6 +237,13 @@ const sample = <T>(arr: T[], n: number): T[] => {
   return copy.slice(0, n);
 };
 
+const hasImageBackdrop = (content: Content): boolean => {
+  const url = (content.backdrop || content.poster || '').toLowerCase();
+  if (!url) return false;
+  // Reject obvious video extensions to keep hero on images only
+  return !url.match(/\.(webm|mp4|mkv|mov)$/);
+};
+
 const filterByType = (items: Content[], type: 'movie' | 'tv' | 'all') =>
   type === 'all' ? items : items.filter(i => i.type === type);
 
@@ -377,6 +384,14 @@ export async function getTopRatedTV(): Promise<Content[]> {
 export async function getTop10(): Promise<Content[]> {
   const trending = await getTrendingMovies();
   return trending.slice(0, 10);
+}
+
+export async function getRandomHero(type: 'movie' | 'tv' | 'all' = 'all'): Promise<Content | null> {
+  const catalog = await loadCatalog();
+  const pool = filterByType(catalog, type).filter(hasImageBackdrop);
+  if (!pool.length) return null;
+  const [pick] = sample(pool, 1);
+  return pick || null;
 }
 
 export async function getByGenre(type: 'movie' | 'tv' | 'all', genreId: number, limit = 50): Promise<Content[]> {

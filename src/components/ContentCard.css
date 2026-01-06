@@ -255,6 +255,13 @@
   flex-wrap: wrap;
 }
 
+/* On small screens the links clutter the card and are hard to tap; hide them to avoid accidental redirects */
+@media (max-width: 768px) {
+  .card-links {
+    display: none;
+  }
+}
+
 .card-link {
   font-size: 0.78rem;
   color: #d5e2ff;

@@ -10,7 +10,7 @@ import { Content, Category } from './types';
 import { addToContinueWatching, getContinueWatching, migrateKnownFixes, getMyList } from './utils/storage';
 import { usePlayerTracking } from './hooks/usePlayerTracking';
 import { useTVNavigation } from './hooks/useTVNavigation';
-import { searchTMDB, getTrendingMovies, getTopRatedMovies, getTop10, getByGenre, getTrendingTV, getRecommendations, getUpcomingMovies, getCriticallyAcclaimed, getHiddenGems, getTrendingToday, getMoviesByActor, findCollectionByMovie, getRecentlyAdded, getForYouContent, getRegionalContent, getFemaleDirectedContent, getLGBTContent, getScienceFictionContent, getRomanticComedyContent } from './utils/wikidataAdapter';
+import { searchTMDB, getTrendingMovies, getTopRatedMovies, getTop10, getByGenre, getTrendingTV, getRecommendations, getUpcomingMovies, getCriticallyAcclaimed, getHiddenGems, getTrendingToday, getMoviesByActor, findCollectionByMovie, getRecentlyAdded, getForYouContent, getRegionalContent, getFemaleDirectedContent, getLGBTContent, getScienceFictionContent, getRomanticComedyContent, getRandomHero } from './utils/wikidataAdapter';
 import { MoodSelector } from './components/MoodSelector';
 import './App.css';
 
@@ -24,7 +24,7 @@ function App() {
   const [continueWatching, setContinueWatching] = useState<Content[]>(getContinueWatching());
   const [searchResults, setSearchResults] = useState<Content[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [heroContent, setHeroContent] = useState<Content | null>(null);
+  const [heroContent, setHeroContent] = useState<Content[]>([]);
   const [trendingMovies, setTrendingMovies] = useState<Content[]>([]);
   const [isLoadingHero, setIsLoadingHero] = useState(false);
   const [rowAction, setRowAction] = useState<Content[]>([]);
@@ -286,31 +286,27 @@ function App() {
     const loadHeroContent = async () => {
       setIsLoadingHero(true);
       try {
-        let content: Content[] = [];
-        
-        if (currentCategory === 'movies') {
-          // Fetch top-rated movies for movie category
-          content = await getTopRatedMovies();
-        } else {
-          // For 'all', fetch trending movies
-          content = await getTrendingMovies();
+        // Use getRandomHero to fetch 5 unique random items
+        const { getRandomHero } = await import('./utils/wikidataAdapter');
+        const type = currentCategory === 'movies' ? 'movie' : 'all';
+        const items: Content[] = [];
+        const ids = new Set<string>();
+        // Try to get 5 unique items
+        for (let i = 0; i < 10 && items.length < 5; i++) {
+          const item = await getRandomHero(type);
+          if (item && !ids.has(item.id)) {
+            items.push(item);
+            ids.add(item.id);
+          }
         }
-        
-        if (content.length > 0) {
-          // Pick a random one from the first 5 for variety
-          const randomIndex = Math.floor(Math.random() * Math.min(5, content.length));
-          setHeroContent(content[randomIndex]);
-        } else {
-          setHeroContent(null);
-        }
+        setHeroContent(items);
       } catch (error) {
         console.error('Error loading hero content:', error);
-        setHeroContent(null);
+        setHeroContent([]);
       } finally {
         setIsLoadingHero(false);
       }
     };
-
     loadHeroContent();
   }, [currentCategory]);
 
@@ -585,17 +581,9 @@ function App() {
 
   const handleShuffle = async () => {
     try {
-      // Get a mix of trending content
-      const [movies, tv] = await Promise.all([
-        getTrendingMovies(),
-        getTrendingTV(),
-      ]);
-      const allContent = [...movies, ...tv].filter(c => c.poster);
-      if (allContent.length === 0) return;
-      
-      // Pick random item
-      const random = allContent[Math.floor(Math.random() * allContent.length)];
-      handlePlayContent(random);
+      // Pick a truly random item from the full catalog (image backdrop only)
+      const random = await getRandomHero('all');
+      if (random) handlePlayContent(random);
     } catch (error) {
       console.error('Error shuffling:', error);
     }
@@ -614,6 +602,7 @@ function App() {
 
   // Use dynamic hero content from TMDB or fallback to featured content
   const displayedHeroContent = useMemo(() => {
+    // If searching, prioritize search results as hero and keep only items with images
     const isVideoUrl = (url: string) => /\.(webm|mp4|ogv|ogg|mkv)(\?|$)/i.test(url);
     const hasBackdrop = (c: Content | null | undefined) => {
       const src = c?.backdrop?.trim() || '';
@@ -621,39 +610,13 @@ function App() {
       if (isVideoUrl(src)) return false;
       return true;
     };
-    const sampleRandom = (items: Content[], count: number) => {
-      const pool = [...items];
-      for (let i = pool.length - 1; i > 0; i -= 1) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [pool[i], pool[j]] = [pool[j], pool[i]];
-      }
-      return pool.slice(0, count);
-    };
-
-    // If searching, prioritize search results as hero and keep only items with images
     if (searchQuery.trim() && searchResults.length > 0) {
       const withImages = searchResults.filter(hasBackdrop);
-      const picked = sampleRandom(withImages, 5);
-      return picked.length > 0 ? picked : [];
+      return withImages.slice(0, 5);
     }
-
-    const baseHero = heroContent && hasBackdrop(heroContent) ? heroContent : null;
-    const heroPool: Content[] = [];
-    if (baseHero) heroPool.push(baseHero);
-
-    // Add a pool based on category for variety
-    if (currentCategory === 'all') heroPool.push(...trendingMovies);
-    else if (currentCategory === 'movies') heroPool.push(...rowAction);
-
-    const withImages = heroPool.filter(hasBackdrop);
-    const uniqueById = new Map<string, Content>();
-    withImages.forEach((item) => {
-      if (!uniqueById.has(item.id)) uniqueById.set(item.id, item);
-    });
-
-    const sampled = sampleRandom(Array.from(uniqueById.values()), 5);
-    return sampled.length > 0 ? sampled : [];
-  }, [heroContent, currentCategory, trendingMovies, rowAction, rowComedy, searchQuery, searchResults]);
+    // Use the 5 random hero items from state
+    return heroContent;
+  }, [heroContent, searchQuery, searchResults]);
 
   return (
     <div className="app">
