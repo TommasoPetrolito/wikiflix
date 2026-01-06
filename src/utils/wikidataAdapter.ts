@@ -194,7 +194,16 @@ const sortByScore = <T extends { score: number }>(items: T[]) => items.sort((a, 
 const loadManifest = async () => {
   if (manifestPromise) return manifestPromise;
   manifestPromise = fetch(MANIFEST_URL)
-    .then(res => res.json())
+    .then(async res => {
+      const text = await res.text();
+      console.log('[DEBUG] Manifest fetch response:', text);
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        console.error('[ERROR] Manifest JSON parse failed:', e);
+        throw e;
+      }
+    })
     .catch(() => ({ dim: 384 }));
   return manifestPromise;
 };

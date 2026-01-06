@@ -13,6 +13,7 @@
 .search-hero {
   width: 100%;
   margin-bottom: 1.5rem;
+  margin-top: 4rem;
 }
 
 .search-hero-card {
@@ -201,8 +202,8 @@
   border-bottom: 2px solid rgba(229, 9, 20, 0.3);
   border-radius: 0;
   color: #fff;
-  font-size: clamp(2.5rem, 4vw + 1rem, 4rem);
-  font-weight: 800;
+  font-size: clamp(1.1rem, 2vw + 0.8rem, 2rem);
+  font-weight: 600;
   outline: none;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: none;
@@ -1272,6 +1273,12 @@ grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
 }
 
 @media (max-width: 480px) {
+    .hero-search-input {
+      font-size: 1rem !important;
+      max-width: 98vw;
+      padding-right: 1.2rem;
+      box-sizing: border-box;
+    }
   .search-page {
     padding: 3.5rem 5% 2.5rem;
   }
