@@ -7,8 +7,8 @@
 - [x] Builder offline (SPARQL → catalogo JSONL + embedding + HNSW).
 
 ## Prossime attività
-- [ ] Integrare in client il caricamento del catalogo statico e costruzione FTS locale.
-- [ ] Worker di ricerca con fusione ANN/FTS e filtri strutturati.
+- [x] Integrare in client il caricamento del catalogo statico e ricerca locale.
+- [ ] (Opz.) Worker di ricerca con fusione ANN/FTS e scoring combinato.
 - [ ] Testare i flussi lingua (preferita, fallback, default EN).
-- [ ] Cache TTL per eventuali chiamate wiki live rimaste (src/utils/cache.ts).
+- [ ] Cache TTL per eventuali chiamate wiki live rimaste (src/utils/cache.ts) o rimuoverle se non più necessarie.
 - [ ] Preparare adattamenti mobile/TV (focus nav, safe areas, asset leggeri).

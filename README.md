@@ -15,7 +15,7 @@ Tale catalogo può però essere aggiornato automaticamente tramite lo script `to
 ## Architettura in breve
 
 - Build-time: [tools/build_catalog.py](tools/build_catalog.py) esegue SPARQL su Wikidata, arricchisce le label con `wbgetentities`, normalizza le URL sorgenti e genera catalogo + embedding + indice ANN.
-- Runtime: il client carica gli artifact statici, costruisce l'FTS locale, genera embedding query (stesso modello) e fonde i risultati; nessuna chiamata live a TMDB o servizi closed.
+- Runtime: il client carica gli artifact statici da `public/catalog/` (manifest, JSONL, embeddings, HNSW). La ricerca ora usa solo catalogo locale: filtri strutturati (tipo/anno/genere/paese) + score semantico/testuale, nessuna chiamata live a TMDB/Wikidata.
 - Dati ammessi: film con almeno una sorgente video aperta; esclusi trailer e elementi non film (vedi query in [DATA_INTEGRATION_TECHNICAL_README.md](DATA_INTEGRATION_TECHNICAL_README.md)).
 
 ## Avvio rapido (app)
@@ -38,6 +38,8 @@ Output in `data/catalog/`:
 - hnsw.index: indice ANN cosine.
 - ids.txt: QID per riga (ordine allineato).
 - manifest.json: metadati modello/file/dimensioni.
+
+Deploy app: copia i file in `public/catalog/` (già referenziati da `searchCatalog`/loader). Nessuna API key esterna richiesta per la ricerca.
 
 Puoi passare `--query` per usare una SPARQL personalizzata o `--device cuda` se disponibile.
 

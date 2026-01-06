@@ -11,6 +11,7 @@ export interface Content {
   subtitles?: string;
   subtitleTracks?: Array<{ src: string; lang?: string; label?: string }>;
   wikidataId?: string;
+  titleLabels?: Record<string, string>;
   commonsLink?: string;
   wikipediaUrl?: string;
   altVideos?: Array<{ kind: 'commons' | 'youtube' | 'archive' | 'libreflix' | 'vimeo'; url: string; label?: string; lang?: string }>;
@@ -22,6 +23,7 @@ export interface Content {
   cast?: string[];
   directors?: string[];
   countries?: string[];
+  descriptions?: Record<string, string>;
   season?: number;
   episode?: number;
 }

@@ -30,7 +30,16 @@ export const InfoModal = ({ content, onClose, onPlay }: InfoModalProps) => {
     if (!text) return '';
     let out = text.replace(/==+\s*(.*?)\s*==+/g, '$1\n');
     out = out.replace(/\r/g, '');
-    out = out.replace(/\n{3,}/g, '\n\n');
+      const pickDescription = (): string | undefined => {
+        const descMap = content.descriptions || {};
+        const lang = preferredLang;
+        const fallbackOrder = [lang, ...fallbacks];
+        for (const code of fallbackOrder) {
+          const d = descMap[code];
+          if (d) return d;
+        }
+        return content.descriptionLong || content.description;
+      };
     return out.trim();
   }, []);
 
@@ -113,7 +122,7 @@ export const InfoModal = ({ content, onClose, onPlay }: InfoModalProps) => {
 
           <div className="info-meta-grid">
             {content.license && (
-              <div className="info-meta">
+                  {formatExtract(richDescription || pickDescription())}
                 <div className="info-meta-label">Licenza</div>
                 <div className="info-meta-value">{content.license}</div>
               </div>

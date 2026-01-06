@@ -4,7 +4,7 @@ import { Navbar } from '@/components/Navbar';
 import { ContentGrid } from '@/components/ContentGrid';
 import { PlayerModal } from '@/components/PlayerModal';
 import { Content, Category } from '@/types';
-import { searchTMDB, getByGenre, getTrendingMovies, getTrendingTV } from '@/utils/wikidataAdapter';
+import { searchCatalog, getByGenre, getTrendingMovies, getTrendingTV } from '@/utils/wikidataAdapter';
 import { addToContinueWatching } from '@/utils/storage';
 import './SearchPage.css';
 
@@ -122,31 +122,41 @@ export default function SearchPage() {
 
   useEffect(() => {
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
-    if (!q.trim()) { 
-      setResults([]);
-      // If genre filter is active, load by genre instead
-      if (genreFilter && typeFilter !== 'all') {
-        setIsSearching(true);
-        getByGenre(typeFilter, genreFilter, 50).then(items => {
-          setResults(items);
-          setIsSearching(false);
-        }).catch(() => setIsSearching(false));
-      }
-      return; 
-    }
-    setIsSearching(true);
-    debounceRef.current = window.setTimeout(async () => {
+
+    const runSearch = async () => {
+      setIsSearching(true);
       try {
-        const searchResults = await searchTMDB(q.trim());
+        // If no query but filters are set, pull directly by genre/type
+        if (!q.trim()) {
+          if (genreFilter) {
+            const byGenre = await getByGenre(typeFilter, genreFilter, 80);
+            setResults(byGenre);
+          } else {
+            setResults([]);
+          }
+          return;
+        }
+
+        const searchResults = await searchCatalog(q.trim(), {
+          type: typeFilter,
+          genreId: genreFilter,
+          yearFrom: typeof yearFrom === 'number' ? yearFrom : undefined,
+          yearTo: typeof yearTo === 'number' ? yearTo : undefined,
+          sort: sortBy,
+          limit: 80,
+        });
         setResults(searchResults);
       } catch {
         setResults([]);
       } finally {
         setIsSearching(false);
       }
-    }, 400);
+    };
+
+    debounceRef.current = window.setTimeout(runSearch, 350);
+
     return () => { if (debounceRef.current) window.clearTimeout(debounceRef.current); };
-  }, [q, genreFilter, typeFilter]);
+  }, [q, genreFilter, typeFilter, yearFrom, yearTo, sortBy]);
 
   const filtered = useMemo(() => {
     let items = results;

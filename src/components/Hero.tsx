@@ -79,6 +79,23 @@ export const Hero = ({ content, onPlay, onInfo }: HeroProps) => {
   const currentContent = content[safeIndex];
   if (!currentContent) return null;
 
+  const buildTeaser = (entry: Content) => {
+    const raw = entry.descriptionLong || entry.description || '';
+    const cleaned = raw
+      .replace(/==[^=]+==/g, ' ')
+      .replace(/\n+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const limit = 240;
+    if (cleaned.length <= limit) return cleaned;
+    const truncated = cleaned.slice(0, limit);
+    const lastSpace = truncated.lastIndexOf(' ');
+    const safe = lastSpace > 160 ? truncated.slice(0, lastSpace) : truncated;
+    return `${safe}...`;
+  };
+
+  const teaser = buildTeaser(currentContent);
+
   return (
     <section 
       className="hero hero-carousel"
@@ -167,7 +184,7 @@ export const Hero = ({ content, onPlay, onInfo }: HeroProps) => {
 
       <div className={`hero-content ${isContentTransitioning ? 'transitioning' : ''}`}>
         <h1 className="hero-title">{currentContent.title}</h1>
-        <p className="hero-description">{currentContent.descriptionLong || currentContent.description}</p>
+        <p className="hero-description">{teaser}</p>
         <div className="hero-buttons">
           <button 
             className="btn btn-primary" 

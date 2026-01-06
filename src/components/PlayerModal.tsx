@@ -433,8 +433,19 @@ export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
 
   if (!content) return null;
 
+  const pickDescription = (): string | undefined => {
+    const descMap = content.descriptions || {};
+    const lang = preferredLang;
+    const fallbackOrder = [lang, ...fallbacks];
+    for (const code of fallbackOrder) {
+      const d = descMap[code];
+      if (d) return d;
+    }
+    return content.descriptionLong || content.description;
+  };
+
   const videoKey = content.id; // Force remount on content change to reset iframe
-  const displayDescription = richDescription || content.descriptionLong || content.description;
+  const displayDescription = richDescription || pickDescription();
   const formattedDescription = formatExtract(displayDescription);
   const shouldClampDescription = (formattedDescription.length || 0) > 420;
 

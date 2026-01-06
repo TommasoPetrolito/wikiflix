@@ -2,33 +2,27 @@
 
 ## 1. Origine dati
 
-~~Query SPARQL per i Contenuti (storico)~~
+Pipeline attuale (solo build offline, nessuna chiamata live in runtime):
 
-L'approccio attuale usa l'API MediaWiki/Wikidata (action=query + Cirrus search) con vincoli `haswbstatement:P31=Q11424` (film) e `haswbstatement:P10` (video su Commons), più fallback `wbsearchentities` per coprire casi mancanti. I claim letti includono P10 (video), P18 (poster), P1173 (sottotitoli) e P577 (anno).
-
-Schema di massima della chiamata:
-
-```
-action=query&list=search&srsearch="<query> haswbstatement:P10 haswbstatement:P31=Q11424"
-→ ids → wbgetentities (labels, descriptions, claims P10/P18/P1173/P577)
-```
+- SPARQL su Wikidata per estrarre film con almeno una fonte aperta (Commons/YouTube/Vimeo/Libreflix/IA) e attributi chiave (generi, istanze, registi, paesi, lingue, anno, poster).
+- `wbgetentities` per labels/descriptions multilingua e normalizzazione ID.
+- Normalizzazione URL: Commons → Special:FilePath, YouTube → watch, Vimeo → vimeo.com/{id}, Libreflix → /assistir/{slug}, IA → archive.org/details/{id}.
+- Output: catalog JSONL + embeddings.f32 + hnsw.index + ids.txt + manifest.json, poi copiati in `public/catalog/` e caricati integralmente dal client.
 
 ## 2. Build offline del catalogo (GitHub Action)
 
-Pipeline proposta (client-side only, nessun backend):
+Pipeline attuale (client-side only):
 
-1) In CI: esegui `tools/build_catalog.py` che:
+1) In CI/local: esegui `tools/build_catalog.py` che:
   - Lancia la SPARQL (vedi query sotto) sull'endpoint Wikidata e salva i binding.
   - Recupera le label dei Q-id con `wbgetentities` (registi, paesi, generi, licenze, lingue).
   - Normalizza le fonti video (Commons P10 → Special:FilePath, YouTube P1651 → watch, Vimeo P4015, Libreflix P6614 → /assistir/, IA P724 → details).
   - Scrive `data/catalog/catalog.jsonl` con i campi tipo `Content` (title, descrizioni, year, poster, altVideos, directors, countries, genres…).
   - Calcola embedding multilingua (default `intfloat/multilingual-e5-small`), salva `embeddings.f32` e un indice ANN HNSW `hnsw.index`, più `ids.txt` e `manifest.json`.
 
-2) Deploy: pubblica gli artifact statici (catalog.jsonl, embeddings.f32, hnsw.index, ids.txt, manifest.json) insieme all'app. Il client li carica e usa:
-  - FTS client-side per testo (MiniSearch/lunr) sul catalogo.
-  - ANN (HNSW) per semantica, con embedding query generati client-side (stesso modello quantizzato) o precalcolati serverless.
+2) Deploy: copia gli artifact statici in `public/catalog/` (già referenziati dal loader client). Nessuna API key esterna.
 
-3) Runtime: filtri strutturati sul catalogo in memoria; fusion dei risultati FTS/ANN (es. RRF) e rendering dai metadati locali. Nessuna chiamata live a Wikidata/Wikipedia per la ricerca.
+3) Runtime: filtri strutturati e ricerca semantica/testuale sul catalogo in memoria; nessuna chiamata live a Wikidata/MediaWiki.
 
 Comandi utili (CI):
 ```

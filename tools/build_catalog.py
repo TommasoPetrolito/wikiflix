@@ -33,14 +33,17 @@ WIKIDATA_SPARQL = "https://query.wikidata.org/sparql"
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 DEFAULT_QUERY = r"""
 SELECT 
-  ?item ?itemLabel ?itemDescription ?year 
-  ?directorID ?image 
-  ?commonsVideo ?youtubeID ?vimeoID ?libreflixID ?iaID 
-  ?instanceIDs ?genreIDs ?licenseIDs ?languageIDs ?countryIDs
+    ?item ?itemLabel ?itemDescription ?year 
+    ?directorID ?image 
+        ?commonsVideo ?youtubeID ?vimeoID ?libreflixID ?iaID 
+        ?instanceIDs ?genreIDs ?licenseIDs ?languageIDs ?countryIDs ?durationAmount ?durationUnit ?durationRaw
 WHERE {
   {
     SELECT ?item 
            (SAMPLE(YEAR(?pubDate)) AS ?year)
+            (SAMPLE(?durationAmount) AS ?durationAmount)
+            (SAMPLE(?durationUnit) AS ?durationUnit)
+            (SAMPLE(?durationRaw) AS ?durationRaw)
            (SAMPLE(?poster) AS ?image)
            (SAMPLE(?commons) AS ?commonsVideo) 
            (SAMPLE(?youtube) AS ?youtubeID) 
@@ -60,13 +63,17 @@ WHERE {
         { ?item wdt:P10 ?commons . } UNION
         { ?item wdt:P577 ?pubDate . FILTER(YEAR(?pubDate) < 1926) }
       }
-      {
-        { ?item wdt:P10 ?commons . } UNION
-        { ?item wdt:P1651 ?youtube . } UNION
-        { ?item wdt:P4015 ?vimeo . } UNION
-        { ?item wdt:P6614 ?libreflix . } UNION
-        { ?item wdt:P724 ?ia . }
-      }
+            {
+                {
+                    ?item p:P10 ?commonsStmt .
+                    FILTER NOT EXISTS { ?commonsStmt pq:P3831 wd:Q622550 }
+                    ?commonsStmt ps:P10 ?commons .
+                } UNION
+                { ?item wdt:P1651 ?youtube . } UNION
+                { ?item wdt:P4015 ?vimeo . } UNION
+                { ?item wdt:P6614 ?libreflix . } UNION
+                { ?item wdt:P724 ?ia . }
+            }
       OPTIONAL { ?item wdt:P31 ?instanceOf . }
       OPTIONAL { ?item wdt:P136 ?genre . }
       OPTIONAL { ?item wdt:P275 ?license . }
@@ -74,9 +81,15 @@ WHERE {
       OPTIONAL { ?item wdt:P495 ?country . }
       OPTIONAL { ?item wdt:P57 ?dir . }
       OPTIONAL { ?item wdt:P18 ?poster . }
-      OPTIONAL { ?item wdt:P577 ?pubDate . }
-      MINUS { ?item wdt:P31 wd:Q97570383 }
-      MINUS { ?item p:P10/pq:P3831 wd:Q622550 }
+            OPTIONAL { ?item wdt:P577 ?pubDate . }
+            OPTIONAL {
+                ?item p:P2047 ?durationStatement .
+                ?durationStatement psv:P2047 ?durationValue .
+                ?durationValue wikibase:quantityAmount ?durationAmount .
+                ?durationValue wikibase:quantityUnit ?durationUnit .
+            }
+            OPTIONAL { ?item wdt:P2047 ?durationRaw . }
+    MINUS { ?item wdt:P31 wd:Q97570383 }
     }
     GROUP BY ?item
   }
@@ -134,6 +147,13 @@ LABEL_LANGS = [
     "sl",
 ]
 
+DURATION_UNIT_FACTORS = {
+    "http://www.wikidata.org/entity/Q11574": 1,  # second
+    "http://www.wikidata.org/entity/Q7727": 60,  # minute
+    "http://www.wikidata.org/entity/Q25235": 3600,  # hour
+    "http://www.wikidata.org/entity/Q573": 86400,  # day
+}
+
 
 def to_qid(value: Optional[str]) -> Optional[str]:
     if not value:
@@ -178,6 +198,7 @@ class CatalogItem:
     license_id: Optional[str]
     license: Optional[str]
     language: Optional[str]
+    duration_seconds: Optional[int]
 
 
 def fetch_sparql(query: str, endpoint: str = WIKIDATA_SPARQL, timeout: int = 60) -> List[dict]:
@@ -428,6 +449,23 @@ def binding_val(b: dict, key: str) -> Optional[str]:
     return b.get(key, {}).get("value")
 
 
+def normalize_duration_seconds(amount: Optional[str], unit: Optional[str], fallback_raw: Optional[str]) -> Optional[int]:
+    """Normalize duration to seconds using unit if available, otherwise fall back to raw."""
+    if amount and unit:
+        try:
+            factor = DURATION_UNIT_FACTORS.get(unit)
+            if factor:
+                return int(round(float(amount) * factor))
+        except Exception:
+            pass
+    if fallback_raw:
+        try:
+            return int(float(fallback_raw))
+        except Exception:
+            return None
+    return None
+
+
 def build_catalog(
     rows: List[dict],
     labels: Dict[str, Dict[str, str]],
@@ -454,6 +492,11 @@ def build_catalog(
 
         year_raw = binding_val(r, "year")
         year = int(year_raw) if year_raw and year_raw.isdigit() else None
+
+        duration_amount = binding_val(r, "durationAmount")
+        duration_unit = binding_val(r, "durationUnit")
+        duration_raw = binding_val(r, "durationRaw")
+        duration_seconds = normalize_duration_seconds(duration_amount, duration_unit, duration_raw)
         poster = commons_to_filepath(binding_val(r, "image"))
 
         commons = commons_to_filepath(binding_val(r, "commonsVideo"))
@@ -507,6 +550,7 @@ def build_catalog(
                 license_id=license_id,
                 license=license_label,
                 language=language_label,
+                duration_seconds=duration_seconds,
             )
         )
     return items
@@ -558,6 +602,7 @@ def to_jsonl(items: Iterable[CatalogItem], labels: Dict[str, Dict[str, str]], pa
                 "license": it.license,
                 "licenseLabels": labels.get(it.license_id) if it.license_id else None,
                 "language": it.language,
+                "durationSeconds": it.duration_seconds,
             }
             f.write(json.dumps({k: v for k, v in obj.items() if v is not None}, ensure_ascii=False) + "\n")
 
@@ -617,7 +662,12 @@ def write_manifest(manifest_path: pathlib.Path, model: str, dim: int, catalog: s
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build static catalog and ANN index from Wikidata")
-    parser.add_argument("--out", type=pathlib.Path, default=pathlib.Path("data/catalog"), help="Output directory")
+    parser.add_argument(
+        "--out",
+        type=pathlib.Path,
+        default=pathlib.Path("public/catalog"),
+        help="Output directory (default: public/catalog for direct app consumption)",
+    )
     parser.add_argument(
         "--catalog-input",
         type=pathlib.Path,
