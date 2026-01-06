@@ -41,3 +41,29 @@ GITHUB_TOPICS.md
 # Android signing keystore (do not commit)
 android/app/release-keystore.jks
 
+# --- Wikiflix custom ignores ---
+# Tool/binary artifacts
+bundletool-all-*.jar
+aab-manifest.txt
+
+# Capacitor/Android build outputs (redundant if in android/.gitignore, but safe)
+android/app/build/
+android/app/outputs/
+android/build/
+android/outputs/
+
+# Local Capacitor config (if not meant for repo)
+capacitor.config.ts
+
+# Python venv (if present in root)
+streaming_pilot_venv/
+
+# Miscellaneous
+*.bak
+*.tmp
+*.swp
+*.orig
+*.rej
+
+# End Wikiflix custom ignores
+

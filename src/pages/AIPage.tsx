@@ -144,8 +144,8 @@ export default function AIPage() {
       addBucket(() => getByGenre('movie', 10751, 24), 'family');
       addBucket(() => getByGenre('movie', 16, 24), 'animation');
     }
-    if (facets.has('lgbt')) addBucket(() => getLGBTContent(18), 'LGBT');
-    if (facets.has('femaleDirector')) addBucket(() => getFemaleDirectedContent(18), 'female directors');
+    if (facets.has('lgbt')) addBucket(() => getLGBTContent(), 'LGBT');
+    if (facets.has('femaleDirector')) addBucket(() => getFemaleDirectedContent(), 'female directors');
 
     if (facets.has('region-es')) addBucket(() => getRegionalContent('spanish'), 'spanish');
     if (facets.has('region-uk')) addBucket(() => getRegionalContent('uk'), 'uk');

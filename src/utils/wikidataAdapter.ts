@@ -444,11 +444,11 @@ export async function getTrendingToday(): Promise<Content[]> {
   return sample(catalog, 20);
 }
 
-export async function getMoviesByActor(actorName: string): Promise<{ actor: string; content: Content[]; profilePath: string | null } | null> {
+export async function getMoviesByActor(_actorName: string): Promise<{ actor: string; content: Content[]; profilePath: string | null } | null> {
   return null;
 }
 
-export async function findCollectionByMovie(movieId: number): Promise<{ name: string; content: Content[] } | null> {
+export async function findCollectionByMovie(_movieId: number): Promise<{ name: string; content: Content[] } | null> {
   return null;
 }
 

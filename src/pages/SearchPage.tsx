@@ -4,7 +4,7 @@ import { Navbar } from '@/components/Navbar';
 import { ContentGrid } from '@/components/ContentGrid';
 import { PlayerModal } from '@/components/PlayerModal';
 import { Content, Category } from '@/types';
-import { searchCatalog, getByGenre, getTrendingMovies, getTrendingTV } from '@/utils/wikidataAdapter';
+import { searchCatalog, getByGenre, getTrendingMovies } from '@/utils/wikidataAdapter';
 import { addToContinueWatching } from '@/utils/storage';
 import './SearchPage.css';
 

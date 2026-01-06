@@ -10,12 +10,11 @@ import { Content, Category } from './types';
 import { addToContinueWatching, getContinueWatching, migrateKnownFixes, getMyList } from './utils/storage';
 import { usePlayerTracking } from './hooks/usePlayerTracking';
 import { useTVNavigation } from './hooks/useTVNavigation';
-import { searchTMDB, getTrendingMovies, getTopRatedMovies, getTop10, getByGenre, getTrendingTV, getRecommendations, getUpcomingMovies, getCriticallyAcclaimed, getHiddenGems, getTrendingToday, getMoviesByActor, findCollectionByMovie, getRecentlyAdded, getForYouContent, getRegionalContent, getFemaleDirectedContent, getLGBTContent, getScienceFictionContent, getRomanticComedyContent, getRandomHero } from './utils/wikidataAdapter';
+import { searchTMDB, getTrendingMovies, getTop10, getByGenre, getTrendingTV, getRecommendations, getUpcomingMovies, getCriticallyAcclaimed, getHiddenGems, getTrendingToday, getMoviesByActor, findCollectionByMovie, getRecentlyAdded, getForYouContent, getRegionalContent, getFemaleDirectedContent, getLGBTContent, getScienceFictionContent, getRomanticComedyContent, getRandomHero } from './utils/wikidataAdapter';
 import { MoodSelector } from './components/MoodSelector';
 import './App.css';
 
-const FALLBACK_CONTENT: Content | null = null;
-
+ 
 function App() {
   const [currentCategory, setCurrentCategory] = useState<Category>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -115,7 +114,7 @@ function App() {
       if (continueWatching.length === 0) { setRowBecause({title:'', items: []}); return; }
       const anchor = continueWatching[0];
       try {
-        const recs = await getRecommendations(anchor.type, anchor.id);
+        const recs = await getRecommendations(anchor.id);
         setRowBecause({ title: `Because you watched ${anchor.title}`, items: recs.slice(0, 40) });
       } catch {
         setRowBecause({title:'', items: []});
