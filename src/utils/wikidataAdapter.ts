@@ -33,9 +33,9 @@ type RegionKey = 'spanish' | 'uk' | 'australia' | 'canada' | 'brazil' | 'germany
 
 type MoodKey = 'action' | 'comedy' | 'dark' | 'family';
 
-const MANIFEST_URL = '/catalog/catalog_v2_manifest.json';
-const CATALOG_URL = '/catalog/catalog_v2.jsonl';
-const EMBEDDINGS_URL = '/catalog/catalog_v2_embeddings.f32';
+const MANIFEST_URL = '/catalog/catalog_manifest.json';
+const CATALOG_URL = '/catalog/catalog.jsonl';
+const EMBEDDINGS_URL = '/catalog/catalog_embeddings.f32';
 
 const REGION_COUNTRY_LABELS: Record<RegionKey, string[]> = {
   spanish: ['Spain', 'Mexico', 'Argentina', 'Chile', 'Colombia', 'Peru', 'Uruguay'],

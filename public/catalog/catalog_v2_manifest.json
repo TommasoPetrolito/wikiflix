@@ -1,9 +1,0 @@
-{
-  "model": "intfloat/multilingual-e5-small",
-  "dim": 384,
-  "metric": "cosine",
-  "catalog": "catalog_v2.jsonl",
-  "embeddings": "catalog_v2_embeddings.f32",
-  "index": "catalog_v2_hnsw.index",
-  "ids": "catalog_v2_ids.txt"
-}
