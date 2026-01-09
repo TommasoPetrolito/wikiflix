@@ -13,8 +13,10 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
-        <!-- This is needed for the edge-to-edge display to work correctly on devices with cutouts -->
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <!-- Makes the navigation bar transparent so content can be seen behind it -->
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
     </style>
 
 
