@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { Content } from '@/types';
 import './WatchParty.css';
 
@@ -9,6 +10,30 @@ interface WatchPartyProps {
 }
 
 export const WatchParty = ({ content, playerUrl, onClose }: WatchPartyProps) => {
+    // Gestione rotazione schermo per iframe fullscreen (WatchParty)
+    useEffect(() => {
+      const lockLandscape = async () => {
+        try {
+          await ScreenOrientation.lock({ orientation: 'landscape' });
+        } catch (err) {}
+      };
+      const unlock = async () => {
+        try {
+          await ScreenOrientation.unlock();
+        } catch (err) {}
+      };
+      const handleFullscreenChange = async () => {
+        if (document.fullscreenElement) {
+          await lockLandscape();
+        } else {
+          await unlock();
+        }
+      };
+      document.addEventListener('fullscreenchange', handleFullscreenChange);
+      return () => {
+        document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      };
+    }, []);
   const [roomId, setRoomId] = useState<string>('');
   const [isHost, setIsHost] = useState(false);
   const [participants] = useState<string[]>(['You']);

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { Content } from '@/types';
 import { useLanguage, getLanguageHostCandidates } from '@/contexts/LanguageContext';
 import { LanguageSelector } from '@/components/LanguageSelector';
@@ -10,6 +11,30 @@ interface PlayerModalProps {
 }
 
 export const PlayerModal = ({ content, onClose }: PlayerModalProps) => {
+    // Gestione rotazione schermo in fullscreen (HTML5 video o iframe)
+    useEffect(() => {
+      const lockLandscape = async () => {
+        try {
+          await ScreenOrientation.lock({ orientation: 'landscape' });
+        } catch (err) {}
+      };
+      const unlock = async () => {
+        try {
+          await ScreenOrientation.unlock();
+        } catch (err) {}
+      };
+      const handleFullscreenChange = async () => {
+        if (document.fullscreenElement) {
+          await lockLandscape();
+        } else {
+          await unlock();
+        }
+      };
+      document.addEventListener('fullscreenchange', handleFullscreenChange);
+      return () => {
+        document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      };
+    }, []);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [localSubtitleUrl, setLocalSubtitleUrl] = useState<string | null>(null);
