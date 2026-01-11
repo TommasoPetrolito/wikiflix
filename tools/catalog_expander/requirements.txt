@@ -4,8 +4,6 @@ tqdm
 
 # AI e Ricerca Semantica (E5 Multilingual)
 sentence-transformers
-onnx
-onnxruntime
 
 # YouTube Scraping (Nota: yt-dlp è spesso aggiornato, meglio installarlo globalmente)
 yt-dlp
